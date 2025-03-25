@@ -133,7 +133,7 @@ int main(int argc, char **argv)
 
                 if(!playingSound){
                     playingSound = true;
-                    sc.playWave(path_to_sounds + "Discontent.wav");
+                    sc.playWave(path_to_sounds + "Girl Screaming Sound Effect.wav");
                 }
                 break;
 

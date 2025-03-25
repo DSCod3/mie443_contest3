@@ -9,19 +9,26 @@ using namespace std;
 
 geometry_msgs::Twist follow_cmd;
 int world_state;
+Status status;
+bool playingSound;
 
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
 }
 
-// void bumperCB(const geometry_msgs::Twist msg){
-//     //Fill with code
-// }
+void haltMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
+	vel.angular.z = 0;
+	vel.linear.x = 0;
+	vel_pub.publish(vel);
+	ros::spinOnce();
+}
 
 //-------------------------------------------------------------
 
 int main(int argc, char **argv)
 {
+	status = S_FOLLOW;
+	playingSound = false;
 	ros::init(argc, argv, "image_listener");
 	ros::NodeHandle nh;
 	sound_play::SoundClient sc;
@@ -55,36 +62,72 @@ int main(int argc, char **argv)
 	vel.angular.z = angular;
 	vel.linear.x = linear;
 
-	sc.playWave(path_to_sounds + "sound.wav");
+	//sc.playWave(path_to_sounds + "sound.wav");
 	ros::Duration(0.5).sleep();
+
+	
 
 	while(ros::ok() && secondsElapsed <= 480){		
 		ros::spinOnce();
 
-		if(cliffActive){
-			ROS_INFO("CLIFF ACTIVE EVENT");
-			sc.playWave(path_to_sounds + "sound.wav");
+		switch(status){
+			case S_FOLLOW:
+				playingSound = false;
+				vel_pub.publish(follow_cmd);
+				break;
+			case S_BUMPER:
+				haltMovement(vel, vel_pub);
+				ROS_INFO("BUMPER PRESSED EVENT");
+
+				if(!playingSound){
+					playingSound = true;
+					sc.playWave(path_to_sounds + "Rage.wav");
+				}
+				
+				break;
+			case S_CLIFF:
+				haltMovement(vel, vel_pub);
+				ROS_INFO("CLIFF ACTIVE EVENT");
+				
+				if(!playingSound){
+					playingSound = true;
+					sc.playWave(path_to_sounds + "Discontent.wav");
+				}
+
+
+				break;
+			case S_MICROPHONE:
+				haltMovement(vel, vel_pub);
+				break;
+			case S_PLACEHOLDER:
+				haltMovement(vel, vel_pub);
+				break;
 		}
 
-		if(bumpers.anyPressed){
-			ROS_INFO("BUMPER PRESSED EVENT");
-			sc.playWave(path_to_sounds + "sound.wav");
-		}
+
+
+		// if(cliffActive){
+			
+		// }
+
+		// if(bumpers.anyPressed){
+			
+		// }
 
 
 
 
-		if(world_state == 0){
-			//fill with your code
-			//vel_pub.publish(vel);
-			vel_pub.publish(follow_cmd);
+		// if(world_state == 0){
+		// 	//fill with your code
+		// 	//vel_pub.publish(vel);
+		// 	vel_pub.publish(follow_cmd);
 
-		}else if(world_state == 1){
-			/*
-			...
-			...
-			*/
-		}
+		// }else if(world_state == 1){
+		// 	/*
+		// 	...
+		// 	...
+		// 	*/
+		// }
 		secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
 		loop_rate.sleep();
 	}

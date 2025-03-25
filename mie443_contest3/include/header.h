@@ -28,6 +28,10 @@
 
 #include <sound_play/sound_play.h>
 
+#include <kobuki_msgs/BumperEvent.h>
+#include <kobuki_msgs/CliffEvent.h>
+
+
 
 #pragma region Bumper
 

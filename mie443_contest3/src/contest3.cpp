@@ -14,9 +14,9 @@ void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
 }
 
-void bumperCB(const geometry_msgs::Twist msg){
-    //Fill with code
-}
+// void bumperCB(const geometry_msgs::Twist msg){
+//     //Fill with code
+// }
 
 //-------------------------------------------------------------
 
@@ -33,7 +33,8 @@ int main(int argc, char **argv)
 
 	//subscribers
 	ros::Subscriber follower = nh.subscribe("follower_velocity_smoother/smooth_cmd_vel", 10, &followerCB);
-	ros::Subscriber bumper = nh.subscribe("mobile_base/events/bumper", 10, &bumperCB);
+	ros::Subscriber bumper = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
+	ros::Subscriber cliff_sub = nh.subscribe("/mobile_base/events/cliff", 10, &cliffCallback);
 
     // contest count down timer
 	ros::Rate loop_rate(10);
@@ -66,7 +67,7 @@ int main(int argc, char **argv)
 		}
 
 		if(bumpers.anyPressed){
-			ROS_INF0("BUMPER PRESSED EVENT");
+			ROS_INFO("BUMPER PRESSED EVENT");
 			sc.playWave(path_to_sounds + "sound.wav");
 		}
 

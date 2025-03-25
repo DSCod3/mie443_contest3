@@ -11,7 +11,7 @@ geometry_msgs::Twist follow_cmd;
 int world_state;
 Status status;
 bool playingSound;
-ros::Time lastFollowTime;  // NEW: To track the last follower command
+ros::Time lastFollowTime;  // To track the last follower command
 
 // Update follower callback to refresh the tracking timer.
 void followerCB(const geometry_msgs::Twist msg){
@@ -124,7 +124,7 @@ int main(int argc, char **argv)
                 setMovement(vel, vel_pub, 0, 0);
                 if(!playingSound){
                     playingSound = true;
-                    sc.playWave(path_to_sounds + "infatuated.wav");
+                    sc.playWave(path_to_sounds + "Infatuated.wav");
                 }
                 // After processing microphone input, revert to follow.
                 status = S_FOLLOW;

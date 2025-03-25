@@ -80,7 +80,7 @@ int main(int argc, char **argv)
 				// Play fear sound when backing up
 				if (follow_cmd.linear.x < 0) {
 					if (!backingSoundPlayed) {
-						sc.playWave(path_to_sounds + "Fear.wav");
+						sc.playWave(path_to_sounds + "Fear_Heavy_Breath.wav");
 						backingSoundPlayed = true;
 					}
 				} else {

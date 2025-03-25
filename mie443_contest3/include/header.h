@@ -28,4 +28,21 @@
 
 #include <sound_play/sound_play.h>
 
+
+#pragma region Bumper
+
+extern uint8_t bumper[3];
+
+struct BumpersStruct{
+    bool leftPressed;
+    bool centerPressed;
+    bool rightPressed;
+    bool anyPressed;
+};
+
+extern BumpersStruct bumpers;
+
+#pragma endregion
+
+
 #endif

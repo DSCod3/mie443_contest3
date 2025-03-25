@@ -2,6 +2,8 @@
 #include <ros/package.h>
 #include <imageTransporter.hpp>
 #include <chrono>
+#include <bumper.h>
+#include <cliff.h>
 
 using namespace std;
 
@@ -57,6 +59,19 @@ int main(int argc, char **argv)
 
 	while(ros::ok() && secondsElapsed <= 480){		
 		ros::spinOnce();
+
+		if(cliffActive){
+			ROS_INFO("CLIFF ACTIVE EVENT");
+			sc.playWave(path_to_sounds + "sound.wav");
+		}
+
+		if(bumpers.anyPressed){
+			ROS_INF0("BUMPER PRESSED EVENT");
+			sc.playWave(path_to_sounds + "sound.wav");
+		}
+
+
+
 
 		if(world_state == 0){
 			//fill with your code

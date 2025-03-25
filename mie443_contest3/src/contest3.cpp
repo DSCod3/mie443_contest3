@@ -131,18 +131,25 @@ int main(int argc, char **argv)
                 break;
 
             case S_CLIFF:
-                ROS_INFO("STATE: CLIFF ACTIVE EVENT");
-                setMovement(vel, vel_pub, 0, 0);
-                if(!playingSound){
-                    playingSound = true;
-                    sc.playWave(path_to_sounds + "Discontent.wav");
-                }
-                // Revert to follow when cliff condition is cleared.
-                if(!cliffActive){
-                    status = S_FOLLOW;
-                    playingSound = false;
-                }
-                break;
+				ROS_INFO("CLIFF ACTIVE EVENT");
+
+				setMovement(vel, vel_pub, 0, 0);
+				
+				// Cliff sensor needs to be debounced. 
+				timeReference = secondsElapsed;
+				while(secondsElapsed - timeReference < 1){
+					if(status == S_CLIFF){
+						secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
+						timeReference = secondsElapsed;
+					}
+					ros::spinOnce();
+				}
+				
+				if(!playingSound){
+					playingSound = true;
+					sc.playWave(path_to_sounds + "Girl Screaming Sound Effect.wav");
+				}
+				break;
 
             case S_MICROPHONE:
                 ROS_INFO("STATE: MICROPHONE EVENT - INFATUATED (GOOD ROBOT)");

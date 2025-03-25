@@ -1,17 +1,35 @@
 #include "sound_direction.h"
 #include <cmath>
 #include <numeric>
+#include <chrono>
+
+// Add these declarations if not already present
+#ifdef __linux__
+extern "C" {
+    int PaAlsa_EnableRealtimeScheduling(PaStream* s, int enable);
+    int PaAlsa_SetNumPeriods(PaStream* s, int numPeriods);
+}
+#endif
+
+// Precomputed Hann window
+const std::array<float, 1024> SoundDirectionDetector::HANN_WINDOW = [](){
+    std::array<float, 1024> window;
+    for(int i=0; i<1024; i++) {
+        window[i] = 0.5f * (1 - cos(2*M_PI*i/(1024-1)));
+    }
+    return window;
+}();
 
 SoundDirectionDetector::SoundDirectionDetector() :
-    stream_(nullptr),
     sampleRate_(44100),
     channels_(4)
 {
     audioBuffers_.resize(channels_);
-    angleHistory.fill(0.0f);
+    angleHistory_.fill(0.0f);
 }
 
 SoundDirectionDetector::~SoundDirectionDetector() {
+    running_ = false;
     if(stream_) {
         Pa_CloseStream(stream_);
         Pa_Terminate();
@@ -34,14 +52,14 @@ bool SoundDirectionDetector::initialize() {
     
     inputParams.channelCount = channels_;
     inputParams.sampleFormat = paFloat32;
-    inputParams.suggestedLatency = Pa_GetDeviceInfo(inputParams.device)->defaultLowInputLatency;
+    inputParams.suggestedLatency = 0.02;  // 20ms latency
     inputParams.hostApiSpecificStreamInfo = nullptr;
 
     err = Pa_OpenStream(&stream_,
                        &inputParams,
                        nullptr,
                        sampleRate_,
-                       1024,
+                       512,  // Smaller buffer size
                        paClipOff,
                        &SoundDirectionDetector::audioCallback,
                        this);
@@ -51,41 +69,60 @@ bool SoundDirectionDetector::initialize() {
         return false;
     }
 
+    #ifdef __linux__
+    // ALSA-specific optimizations (Linux only)
+    if(PaAlsa_EnableRealtimeScheduling) { // Check if function exists
+        PaAlsa_EnableRealtimeScheduling(stream_, 1);
+    }
+    if(PaAlsa_SetNumPeriods) { // Check if function exists
+        PaAlsa_SetNumPeriods(stream_, 3);
+    }
+    #endif
+
     calibrateChannels();
     return true;
 }
 
 int SoundDirectionDetector::audioCallback(const void* inputBuffer,
-                                        void* /*outputBuffer*/,
-                                        unsigned long framesPerBuffer,
-                                        const PaStreamCallbackTimeInfo* /*timeInfo*/,
-                                        PaStreamCallbackFlags /*statusFlags*/,
-                                        void* userData) {
-    SoundDirectionDetector* detector = static_cast<SoundDirectionDetector*>(userData);
-    const float* input = static_cast<const float*>(inputBuffer);
+    void* /*outputBuffer*/,
+    unsigned long framesPerBuffer,
+    const PaStreamCallbackTimeInfo* /*timeInfo*/,
+    PaStreamCallbackFlags /*statusFlags*/,
+    void* userData) {
+SoundDirectionDetector* detector = static_cast<SoundDirectionDetector*>(userData);
+const float* input = static_cast<const float*>(inputBuffer);
 
-    for(unsigned i=0; i<framesPerBuffer; i++) {
-        for(unsigned ch=0; ch<detector->channels_; ch++) {
-            if(detector->audioBuffers_[ch].size() >= detector->sampleRate_) {
-                detector->audioBuffers_[ch].erase(detector->audioBuffers_[ch].begin());
-            }
-            detector->audioBuffers_[ch].push_back(input[i*detector->channels_ + ch]);
-        }
-    }
-    return paContinue;
+std::lock_guard<std::mutex> lock(detector->bufferMutex_);
+
+for(unsigned ch=0; ch<detector->channels_; ch++) {
+auto& buffer = detector->audioBuffers_[ch];
+const float* channelData = input + ch;
+
+// Maintain buffer size
+if(buffer.size() + framesPerBuffer > detector->sampleRate_) {
+buffer.erase(buffer.begin(), buffer.begin() + (buffer.size() + framesPerBuffer - detector->sampleRate_));
+}
+
+// Bulk insert
+buffer.insert(buffer.end(), channelData, channelData + framesPerBuffer * detector->channels_);
+}
+
+return paContinue;
 }
 
 void SoundDirectionDetector::calibrateChannels() {
-    // Collect some silent samples first
     ros::WallDuration(0.5).sleep();
     
+    std::lock_guard<std::mutex> lock(bufferMutex_);
     float sum0 = std::accumulate(audioBuffers_[0].begin(), audioBuffers_[0].end(), 0.0f);
     float sum1 = std::accumulate(audioBuffers_[1].begin(), audioBuffers_[1].end(), 0.0f);
-    channelBalance = (sum1 != 0) ? sum0/sum1 : 1.0f;
-    ROS_INFO("Channel balance calibrated: %.2f", channelBalance);
+    channelBalance_ = (sum1 != 0) ? sum0/sum1 : 1.0f;
+    ROS_INFO("Channel balance calibrated: %.2f", channelBalance_);
 }
 
 float SoundDirectionDetector::calculateVolumeDB(int channel) {
+    std::lock_guard<std::mutex> lock(bufferMutex_);
+    
     if(audioBuffers_[channel].empty()) return -INFINITY;
     
     float sum = 0.0f;
@@ -97,22 +134,33 @@ float SoundDirectionDetector::calculateVolumeDB(int channel) {
 }
 
 float SoundDirectionDetector::getSoundDirection() {
+    std::lock_guard<std::mutex> lock(bufferMutex_);
+    
     if(audioBuffers_[0].size() < 1024 || audioBuffers_[1].size() < 1024)
         return 0.0f;
 
     float maxCorr = -1.0f;
     int bestLag = 0;
-    const int maxLag = 100;
+    // Changed from .data() to direct vector access
+    const std::vector<float>& buf0 = audioBuffers_[0];
+    const std::vector<float>& buf1 = audioBuffers_[1];
+    
+    // Add bounds check
+    if(buf0.size() < 1024 || buf1.size() < 1024) return 0.0f;
 
-    for(int lag = -maxLag; lag <= maxLag; lag++) {
+    // Optimized correlation with step size and reduced lag range
+    for(int lag = -MAX_LAG; lag <= MAX_LAG; lag += 1) {
         float corr = 0.0f;
-        for(int i = maxLag; i < 1024 - maxLag; i++) {
-            // Apply Hann window and calibration
-            float window = 0.5f * (1 - cos(2*M_PI*i/(1024-1)));
-            float sample0 = audioBuffers_[0][i] * window * channelBalance;
-            float sample1 = audioBuffers_[1][i + lag] * window;
-            corr += sample0 * sample1;
+        const int start = std::max(MAX_LAG, -lag);
+        const int end = 1024 - MAX_LAG - std::abs(lag);
+        
+        for(int i = start; i < end; i += PROCESS_STEP) {
+            const int j = i + lag;
+            const float windowed0 = buf0[i] * HANN_WINDOW[i] * channelBalance_;
+            const float windowed1 = buf1[j] * HANN_WINDOW[j];
+            corr += windowed0 * windowed1;
         }
+        
         if(corr > maxCorr) {
             maxCorr = corr;
             bestLag = lag;
@@ -124,58 +172,66 @@ float SoundDirectionDetector::getSoundDirection() {
     sin_theta = std::max(-1.0f, std::min(sin_theta, 1.0f));
     float angle = asin(sin_theta);
 
-    // Apply smoothing
-    angleHistory[historyIndex++ % HISTORY_SIZE] = angle;
-    return std::accumulate(angleHistory.begin(), angleHistory.end(), 0.0f) / HISTORY_SIZE;
+    // Update smoothed angle history
+    angleHistory_[historyIndex_++ % HISTORY_SIZE] = angle;
+    return std::accumulate(angleHistory_.begin(), angleHistory_.end(), 0.0f) / HISTORY_SIZE;
+}
+
+void SoundDirectionDetector::processingLoop() {
+    ros::Rate rate(100);  // 100Hz processing
+    
+    while(running_) {
+        float volume_db = calculateVolumeDB(0);
+        
+        if(soundActive_) {
+            if((ros::Time::now() - eventStart_).toSec() > EVENT_WINDOW) {
+                soundActive_ = false;
+                
+                const int left = leftCount_.load();
+                const int right = rightCount_.load();
+                
+                if(abs(left - right) >= MIN_DOMINANCE) {
+                    std_msgs::String msg;
+                    msg.data = (left > right) ? "LEFT" : "RIGHT";
+                    ROS_INFO("Direction: %s (L:%d R:%d)", msg.data.c_str(), left, right);
+                }
+                
+                leftCount_ = 0;
+                rightCount_ = 0;
+            }
+            else {
+                float angle = getSoundDirection();
+                if(angle < -0.087f) leftCount_++;
+                else if(angle > 0.087f) rightCount_++;
+            }
+        }
+        else if(volume_db > DB_THRESHOLD) {
+            soundActive_ = true;
+            eventStart_ = ros::Time::now();
+        }
+        
+        rate.sleep();
+    }
 }
 
 void SoundDirectionDetector::run() {
-    ros::NodeHandle nh;  // MUST CREATE NODEHANDLE FIRST
+    ros::NodeHandle nh;
     ros::Publisher dir_pub = nh.advertise<std_msgs::String>("/sound_direction", 10);
-    std_msgs::String dir_msg;
-
-    // Calibrate after nodehandle exists
-    calibrateChannels(); 
+    
+    running_ = true;
+    std::thread processor(&SoundDirectionDetector::processingLoop, this);
     
     Pa_StartStream(stream_);
     ROS_INFO("Sound direction detection ready (Threshold: %.1f dB)", DB_THRESHOLD);
 
-    while(ros::ok()) {
+    while(ros::ok() && running_) {
         ros::spinOnce();
-        
-        float volume_db = calculateVolumeDB(0);
-        
-        if(soundActive) {
-            if((ros::Time::now() - eventStart).toSec() > EVENT_WINDOW) {
-                soundActive = false;
-                
-                if(abs(leftCount - rightCount) >= MIN_DOMINANCE) {
-                    dir_msg.data = (leftCount > rightCount) ? "LEFT" : "RIGHT";
-                    dir_pub.publish(dir_msg);
-                    ROS_INFO("Direction: %s (L:%d R:%d)", 
-                            dir_msg.data.c_str(), leftCount, rightCount);
-                }
-                else {
-                    ROS_DEBUG("Ambiguous sound ignored (L:%d R:%d)", leftCount, rightCount);
-                }
-                
-                leftCount = 0;
-                rightCount = 0;
-            }
-            else {
-                float angle = getSoundDirection();
-                if(angle < -0.087f) leftCount++;  // -5 degrees threshold
-                else if(angle > 0.087f) rightCount++;
-            }
-        }
-        else if(volume_db > DB_THRESHOLD) {
-            soundActive = true;
-            eventStart = ros::Time::now();
-            ROS_DEBUG("New sound event started");
-        }
-        
-        usleep(10000);
+        ros::Rate(50).sleep();  // Main loop at 50Hz
     }
+    
+    running_ = false;
+    processor.join();
+    Pa_StopStream(stream_);
 }
 
 int main(int argc, char** argv) {

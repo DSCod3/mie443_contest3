@@ -6,8 +6,15 @@
 #include <vector>
 #include <string>
 #include <array>
-#include <algorithm>
+#include <deque>
+#include <atomic>
+#include <thread>
+#include <mutex>       // Added
+#include <memory>      // Added
 #include <std_msgs/String.h>
+
+
+
 
 class SoundDirectionDetector {
 public:
@@ -19,13 +26,18 @@ public:
 
 private:
     // Configuration
-    static constexpr float DB_THRESHOLD = -25.0f;   // Adjust based on environment
-    static constexpr float EVENT_WINDOW = 0.4f;      // 400ms analysis window
-    static constexpr int MIN_DOMINANCE = 3;          // Required direction difference
-    static constexpr float MIC_SPACING = 0.1f;       // 10cm between mics
-    static constexpr float SOUND_SPEED = 343.0f;     // m/s
-    static constexpr int HISTORY_SIZE = 5;           // Smoothing samples
-    
+    static constexpr float DB_THRESHOLD = -25.0f;
+    static constexpr float EVENT_WINDOW = 0.4f;
+    static constexpr int MIN_DOMINANCE = 3;
+    static constexpr float MIC_SPACING = 0.1f;
+    static constexpr float SOUND_SPEED = 343.0f;
+    static constexpr int HISTORY_SIZE = 5;
+    static constexpr int PROCESS_STEP = 2;
+    static constexpr int MAX_LAG = 50;
+
+    // Precomputed Hann window
+    static const std::array<float, 1024> HANN_WINDOW;
+
     // Audio processing
     static int audioCallback(const void* inputBuffer, void* outputBuffer,
                             unsigned long framesPerBuffer,
@@ -34,22 +46,25 @@ private:
                             void* userData);
     float calculateVolumeDB(int channel);
     float getSoundDirection();
+    void processingLoop();
     void calibrateChannels();
     
-    // State management
-    PaStream* stream_;
+    // Thread-safe buffers
     std::vector<std::vector<float>> audioBuffers_;
-    std::array<float, HISTORY_SIZE> angleHistory;
-    int historyIndex = 0;
-    float channelBalance = 1.0f;
+    std::mutex bufferMutex_;
+    std::array<float, HISTORY_SIZE> angleHistory_;
+    int historyIndex_ = 0;
+    float channelBalance_ = 1.0f;
     
-    // Event tracking
-    bool soundActive = false;
-    ros::Time eventStart;
-    int leftCount = 0;
-    int rightCount = 0;
-    
-    // Hardware params
+    // State management
+    std::atomic<bool> running_{false};
+    std::atomic<int> leftCount_{0};
+    std::atomic<int> rightCount_{0};
+    std::atomic<bool> soundActive_{false};
+    ros::Time eventStart_;
+
+    // Audio stream
+    PaStream* stream_ = nullptr;
     unsigned int sampleRate_;
     unsigned int channels_;
 };

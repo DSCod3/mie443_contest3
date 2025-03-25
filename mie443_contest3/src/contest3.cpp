@@ -112,6 +112,11 @@ int main(int argc, char **argv)
 				ROS_INFO("CLIFF ACTIVE EVENT");
 
 				setMovement(vel, vel_pub, 0, 0);
+
+				if(!playingSound){
+					playingSound = true;
+					sc.playWave(path_to_sounds + "Discontent.wav");
+				}
 				
 				// Cliff sensor needs to be debounced. 
 				timeReference = secondsElapsed;
@@ -123,10 +128,6 @@ int main(int argc, char **argv)
 					ros::spinOnce();
 				}
 				
-				if(!playingSound){
-					playingSound = true;
-					sc.playWave(path_to_sounds + "Discontent.wav");
-				}
 				break;
 
 			case S_MICROPHONE:

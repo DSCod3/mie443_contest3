@@ -11,9 +11,12 @@ geometry_msgs::Twist follow_cmd;
 int world_state;
 Status status;
 bool playingSound;
+ros::Time lastFollowTime;  // NEW: To track the last time a follower command was received
 
+// Update follower callback to refresh the tracking timer.
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
+    lastFollowTime = ros::Time::now();
 }
 
 void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){
@@ -24,7 +27,6 @@ void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, f
 }
 
 //-------------------------------------------------------------
-
 int main(int argc, char **argv)
 {
     status = S_FOLLOW;
@@ -63,11 +65,19 @@ int main(int argc, char **argv)
     vel.angular.z = angular;
     vel.linear.x = linear;
 
-    // sc.playWave(path_to_sounds + "sound.wav");
+    // Initial pause
     ros::Duration(0.5).sleep();
 
     while(ros::ok() && secondsElapsed <= 480){
         ros::spinOnce();
+        ros::Time current_time = ros::Time::now();
+        secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - start).count();
+
+        // LOST TRACKING CHECK:
+        // If in S_FOLLOW and no follower command received for >3 seconds, switch to lost-tracking (S_PLACEHOLDER)
+        if(status == S_FOLLOW && (current_time - lastFollowTime).toSec() > 3.0){
+            status = S_PLACEHOLDER;
+        }
 
         switch(status){
             case S_FOLLOW:
@@ -78,62 +88,58 @@ int main(int argc, char **argv)
 
             case S_BUMPER:
                 ROS_INFO("BUMPER PRESSED EVENT");
-
                 if(!playingSound){
                     playingSound = true;
                     sc.playWave(path_to_sounds + "Rage.wav");
                 }
-
                 // Move backwards for 2 seconds.
                 timeReference = secondsElapsed;
                 while(secondsElapsed - timeReference < 2){
                     secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
-                        std::chrono::system_clock::now()-start).count();
+                        std::chrono::system_clock::now() - start).count();
                     setMovement(vel, vel_pub, -0.2, 0);
                 }
-
-                // After backing up, perform a shaking behavior.
-                // Shake left-right for a few iterations.
+                // Shaking behavior: alternate left and right turning.
                 for (int i = 0; i < 3; i++){
                     // Shake left: turn right (positive angular velocity)
                     timeReference = secondsElapsed;
                     while(secondsElapsed - timeReference < 1){
                         secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
-                            std::chrono::system_clock::now()-start).count();
+                            std::chrono::system_clock::now() - start).count();
                         setMovement(vel, vel_pub, 0, 0.5);
                     }
                     // Shake right: turn left (negative angular velocity)
                     timeReference = secondsElapsed;
                     while(secondsElapsed - timeReference < 1){
                         secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
-                            std::chrono::system_clock::now()-start).count();
+                            std::chrono::system_clock::now() - start).count();
                         setMovement(vel, vel_pub, 0, -0.5);
                     }
                 }
-
-                // Stop movement after the bumper reaction.
+                // Stop movement after bumper reaction.
                 setMovement(vel, vel_pub, 0, 0);
                 ros::spinOnce();
+                // Optionally, revert to S_FOLLOW after bumper event.
+                status = S_FOLLOW;
+                playingSound = false;
                 break;
 
             case S_CLIFF:
                 ROS_INFO("CLIFF ACTIVE EVENT");
                 setMovement(vel, vel_pub, 0, 0);
-
-                // Cliff sensor needs to be debounced.
+                // Debounce the cliff sensor.
                 timeReference = secondsElapsed;
                 while(secondsElapsed - timeReference < 1){
                     if(status == S_CLIFF){
                         secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
-                            std::chrono::system_clock::now()-start).count();
+                            std::chrono::system_clock::now() - start).count();
                         timeReference = secondsElapsed;
                     }
                     ros::spinOnce();
                 }
-
                 if(!playingSound){
                     playingSound = true;
-                    sc.playWave(path_to_sounds + "Girl Screaming Sound Effect.wav");
+                    sc.playWave(path_to_sounds + "Discontent.wav");
                 }
                 break;
 
@@ -142,35 +148,23 @@ int main(int argc, char **argv)
                 break;
 
             case S_PLACEHOLDER:
-                setMovement(vel, vel_pub, 0, 0);
+                ROS_INFO("LOST TRACKING: SEARCHING");
+                if(!playingSound){
+                    playingSound = true;
+                    sc.playWave(path_to_sounds + "sad.wav");
+                }
+                // Search behavior: slowly rotate to find the lost person.
+                setMovement(vel, vel_pub, 0, 0.3);
+                // If a recent follower command is received, revert to S_FOLLOW.
+                if((current_time - lastFollowTime).toSec() < 1.0){
+                    status = S_FOLLOW;
+                    playingSound = false;
+                }
                 break;
         }
 
-		// if(cliffActive){
-			
-		// }
-
-		// if(bumpers.anyPressed){
-			
-		// }
-
-
-		// if(world_state == 0){
-		// 	//fill with your code
-		// 	//vel_pub.publish(vel);
-		// 	vel_pub.publish(follow_cmd);
-
-		// }else if(world_state == 1){
-		// 	/*
-		// 	...
-		// 	...
-		// 	*/
-		// }
-
-		secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
-            std::chrono::system_clock::now()-start).count();
         loop_rate.sleep();
     }
-	
-	return 0;
+
+    return 0;
 }

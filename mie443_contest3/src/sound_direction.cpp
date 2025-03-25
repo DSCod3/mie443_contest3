@@ -1,13 +1,11 @@
 #include "sound_direction.h"
-#include <std_msgs/Float32.h>
-#include <iostream>
-#include <std_msgs/String.h>  // Add for string messages
 #include <cmath>
+#include <algorithm>
 
 SoundDirectionDetector::SoundDirectionDetector() :
     stream_(nullptr),
     sampleRate_(44100),
-    channels_(4)  // Assuming 4-microphone array
+    channels_(4)
 {
     audioBuffers_.resize(channels_);
 }
@@ -42,7 +40,7 @@ bool SoundDirectionDetector::initialize() {
                        &inputParams,
                        nullptr,
                        sampleRate_,
-                       1024,  // framesPerBuffer
+                       1024,
                        paClipOff,
                        &SoundDirectionDetector::audioCallback,
                        this);
@@ -64,7 +62,6 @@ int SoundDirectionDetector::audioCallback(const void* inputBuffer,
     SoundDirectionDetector* detector = static_cast<SoundDirectionDetector*>(userData);
     const float* input = static_cast<const float*>(inputBuffer);
 
-    // Store audio data in circular buffers
     for(unsigned i=0; i<framesPerBuffer; i++) {
         for(unsigned ch=0; ch<detector->channels_; ch++) {
             if(detector->audioBuffers_[ch].size() >= detector->sampleRate_) {
@@ -73,12 +70,21 @@ int SoundDirectionDetector::audioCallback(const void* inputBuffer,
             detector->audioBuffers_[ch].push_back(input[i*detector->channels_ + ch]);
         }
     }
-    
     return paContinue;
 }
 
+float SoundDirectionDetector::calculateVolumeDB(int channel) {
+    if(audioBuffers_[channel].empty()) return -INFINITY;
+    
+    float sum = 0.0f;
+    for(float sample : audioBuffers_[channel]) {
+        sum += sample * sample;
+    }
+    float rms = sqrt(sum / audioBuffers_[channel].size());
+    return 20.0f * log10(rms + 1e-9f);  // Add epsilon to avoid log(0)
+}
+
 float SoundDirectionDetector::getSoundDirection() {
-    // Existing cross-correlation calculation
     if(audioBuffers_[0].size() < 1024 || audioBuffers_[1].size() < 1024)
         return 0.0f;
 
@@ -97,54 +103,36 @@ float SoundDirectionDetector::getSoundDirection() {
         }
     }
 
-    // Convert to angle with clamping
-    const float micSpacing = 0.1f;
-    const float soundSpeed = 343.0f;
     float timeDiff = static_cast<float>(bestLag)/sampleRate_;
-    float sin_theta = (timeDiff * soundSpeed) / micSpacing;
-    
-    // Clamp to valid arcsin range
+    float sin_theta = (timeDiff * SOUND_SPEED) / MIC_SPACING;
     sin_theta = std::max(-1.0f, std::min(sin_theta, 1.0f));
-    float angle_rad = asin(sin_theta);
     
-    // Convert to degrees and determine direction
-    float angle_deg = angle_rad * 180.0f / M_PI;
-    std::string direction = (angle_rad > 0) ? "RIGHT" : "LEFT";
-    
-    // Print readable output
-    ROS_INFO("Sound direction: %s %.1f degrees (raw: %.2f rad)", 
-             direction.c_str(), std::abs(angle_deg), angle_rad);
-    
-    return angle_rad;  // Return original value but log readable info
+    return asin(sin_theta);
 }
 
 void SoundDirectionDetector::run() {
     ros::NodeHandle nh;
-    ros::Publisher pub = nh.advertise<std_msgs::Float32>("/sound_direction", 10);
-    ros::Publisher dir_pub = nh.advertise<std_msgs::String>("/sound_direction_label", 10); // New publisher
+    ros::Publisher dir_pub = nh.advertise<std_msgs::String>("/sound_direction", 10);
     
-    std_msgs::Float32 angleMsg;
-    std_msgs::String dirMsg;
-
+    std_msgs::String dir_msg;
     Pa_StartStream(stream_);
-    ROS_INFO("Sound direction detection started");
+    ROS_INFO("Sound direction detection started (Threshold: %.1f dB)", DB_THRESHOLD);
 
     while(ros::ok()) {
-        float angle_rad = getSoundDirection();
-        
-        // Publish original value
-        angleMsg.data = angle_rad;
-        pub.publish(angleMsg);
-        
-        // Publish human-readable label
-        float angle_deg = angle_rad * 180.0f / M_PI;
-        dirMsg.data = (angle_rad > 0) ? 
-                      "RIGHT " + std::to_string(angle_deg) + " degrees" :
-                      "LEFT " + std::to_string(-angle_deg) + " degrees";
-        dir_pub.publish(dirMsg);
-
         ros::spinOnce();
-        usleep(10000);
+        
+        float volume_db = calculateVolumeDB(0);
+        if(volume_db > DB_THRESHOLD) {
+            float angle = getSoundDirection();
+            dir_msg.data = (angle > 0) ? "RIGHT" : "LEFT";
+            dir_pub.publish(dir_msg);
+            ROS_INFO("Direction: %s (%.1f dB)", dir_msg.data.c_str(), volume_db);
+        }
+        else {
+            ROS_DEBUG_THROTTLE(5.0, "Background noise: %.1f dB", volume_db);
+        }
+        
+        usleep(10000);  // 10ms update rate
     }
 }
 

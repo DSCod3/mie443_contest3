@@ -28,4 +28,35 @@
 
 #include <sound_play/sound_play.h>
 
+#include <kobuki_msgs/BumperEvent.h>
+#include <kobuki_msgs/CliffEvent.h>
+
+
+
+#pragma region Bumper
+
+extern uint8_t bumper[3];
+
+struct BumpersStruct{
+    bool leftPressed;
+    bool centerPressed;
+    bool rightPressed;
+    bool anyPressed;
+};
+
+extern BumpersStruct bumpers;
+
+#pragma endregion
+
+enum Status {
+    S_FOLLOW,
+    S_BUMPER,
+    S_CLIFF,
+    S_MICROPHONE,
+    S_PLACEHOLDER
+};
+
+extern Status status;
+
+
 #endif

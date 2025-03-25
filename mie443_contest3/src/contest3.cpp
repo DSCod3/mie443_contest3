@@ -76,6 +76,16 @@ int main(int argc, char **argv)
 				ROS_INFO("S_FOLLOW");
 				playingSound = false;
 				vel_pub.publish(follow_cmd);
+
+				// Play fear sound when backing up
+				if (follow_cmd.linear.x < 0) {
+					if (!backingSoundPlayed) {
+						sc.playWave(path_to_sounds + "Fear.wav");
+						backingSoundPlayed = true;
+					}
+				} else {
+					backingSoundPlayed = false;
+				}
 				break;
 				
 			case S_BUMPER:
@@ -126,30 +136,6 @@ int main(int argc, char **argv)
 				break;
 		}
 
-
-
-		// if(cliffActive){
-			
-		// }
-
-		// if(bumpers.anyPressed){
-			
-		// }
-
-
-
-
-		// if(world_state == 0){
-		// 	//fill with your code
-		// 	//vel_pub.publish(vel);
-		// 	vel_pub.publish(follow_cmd);
-
-		// }else if(world_state == 1){
-		// 	/*
-		// 	...
-		// 	...
-		// 	*/
-		// }
 		secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
 		loop_rate.sleep();
 	}

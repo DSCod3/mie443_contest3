@@ -1,6 +1,7 @@
 #include "sound_direction.h"
 #include <std_msgs/Float32.h>
 #include <iostream>
+#include <std_msgs/String.h>  // Add for string messages
 #include <cmath>
 
 SoundDirectionDetector::SoundDirectionDetector() :
@@ -103,7 +104,7 @@ float SoundDirectionDetector::getSoundDirection() {
     float sin_theta = (timeDiff * soundSpeed) / micSpacing;
     
     // Clamp to valid arcsin range
-    sin_theta = std::clamp(sin_theta, -1.0f, 1.0f);
+    sin_theta = std::max(-1.0f, std::min(sin_theta, 1.0f));
     float angle_rad = asin(sin_theta);
     
     // Convert to degrees and determine direction

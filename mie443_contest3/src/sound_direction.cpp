@@ -77,13 +77,13 @@ int SoundDirectionDetector::audioCallback(const void* inputBuffer,
 }
 
 float SoundDirectionDetector::getSoundDirection() {
-    // Simple cross-correlation between first two channels
+    // Existing cross-correlation calculation
     if(audioBuffers_[0].size() < 1024 || audioBuffers_[1].size() < 1024)
         return 0.0f;
 
     float maxCorr = -1.0f;
     int bestLag = 0;
-    const int maxLag = 100;  // Corresponds to ~0.7ms at 44.1kHz
+    const int maxLag = 100;
 
     for(int lag = -maxLag; lag <= maxLag; lag++) {
         float corr = 0.0f;
@@ -96,28 +96,54 @@ float SoundDirectionDetector::getSoundDirection() {
         }
     }
 
-    // Convert lag to angle (simplified)
-    const float micSpacing = 0.1f;  // 10cm between mics
-    const float soundSpeed = 343.0f; // m/s
+    // Convert to angle with clamping
+    const float micSpacing = 0.1f;
+    const float soundSpeed = 343.0f;
     float timeDiff = static_cast<float>(bestLag)/sampleRate_;
-    float angle = asin(timeDiff * soundSpeed / micSpacing);
+    float sin_theta = (timeDiff * soundSpeed) / micSpacing;
     
-    return angle;
+    // Clamp to valid arcsin range
+    sin_theta = std::clamp(sin_theta, -1.0f, 1.0f);
+    float angle_rad = asin(sin_theta);
+    
+    // Convert to degrees and determine direction
+    float angle_deg = angle_rad * 180.0f / M_PI;
+    std::string direction = (angle_rad > 0) ? "RIGHT" : "LEFT";
+    
+    // Print readable output
+    ROS_INFO("Sound direction: %s %.1f degrees (raw: %.2f rad)", 
+             direction.c_str(), std::abs(angle_deg), angle_rad);
+    
+    return angle_rad;  // Return original value but log readable info
 }
 
 void SoundDirectionDetector::run() {
     ros::NodeHandle nh;
     ros::Publisher pub = nh.advertise<std_msgs::Float32>("/sound_direction", 10);
+    ros::Publisher dir_pub = nh.advertise<std_msgs::String>("/sound_direction_label", 10); // New publisher
+    
     std_msgs::Float32 angleMsg;
+    std_msgs::String dirMsg;
 
     Pa_StartStream(stream_);
     ROS_INFO("Sound direction detection started");
 
     while(ros::ok()) {
-        angleMsg.data = getSoundDirection();
+        float angle_rad = getSoundDirection();
+        
+        // Publish original value
+        angleMsg.data = angle_rad;
         pub.publish(angleMsg);
+        
+        // Publish human-readable label
+        float angle_deg = angle_rad * 180.0f / M_PI;
+        dirMsg.data = (angle_rad > 0) ? 
+                      "RIGHT " + std::to_string(angle_deg) + " degrees" :
+                      "LEFT " + std::to_string(-angle_deg) + " degrees";
+        dir_pub.publish(dirMsg);
+
         ros::spinOnce();
-        usleep(10000);  // 10ms update rate
+        usleep(10000);
     }
 }
 

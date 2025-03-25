@@ -7,9 +7,28 @@ using namespace std;
 
 geometry_msgs::Twist follow_cmd;
 int world_state;
+int stop_count = 0;
+
+void handleLostTrack(){
+	ROS_INFO("Robot lost track.");
+    // Play a sound or change LED colors, etc.
+    sound_play::SoundClient sc;
+    string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
+    sc.playWave(path_to_sounds + "sad_sound.wav");  // Change path
+}
 
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
+    if (msg.linear.x == 0 && msg.angular.z == 0) {
+        stop_count++;
+    } else {
+        stop_count = 0; // Reset if the robot moves again
+    }
+
+    if (stop_count > 3) { // Adjust threshold based on responsiveness needs
+        handleLostTrack();
+        stop_count = 0; // Reset count after handling
+    }
 }
 
 void bumperCB(const geometry_msgs::Twist msg){
@@ -28,6 +47,7 @@ int main(int argc, char **argv)
 
 	//publishers
 	ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop",1);
+	// ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/navi",1);   // Whats the diff??
 
 	//subscribers
 	ros::Subscriber follower = nh.subscribe("follower_velocity_smoother/smooth_cmd_vel", 10, &followerCB);
@@ -52,7 +72,9 @@ int main(int argc, char **argv)
 	vel.angular.z = angular;
 	vel.linear.x = linear;
 
-	sc.playWave(path_to_sounds + "sound.wav");
+	// Test Sound FIles
+	// sc.playWave(path_to_sounds + "sound.wav");
+	
 	ros::Duration(0.5).sleep();
 
 	while(ros::ok() && secondsElapsed <= 480){		
@@ -60,8 +82,9 @@ int main(int argc, char **argv)
 
 		if(world_state == 0){
 			//fill with your code
-			//vel_pub.publish(vel);
+			// vel_pub.publish(vel);
 			vel_pub.publish(follow_cmd);
+			sc.playWave(path_to_sounds+"sound.wav");
 
 		}else if(world_state == 1){
 			/*

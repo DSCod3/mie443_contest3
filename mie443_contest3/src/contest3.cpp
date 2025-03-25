@@ -16,9 +16,9 @@ void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
 }
 
-void haltMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub){
-	vel.angular.z = 0;
-	vel.linear.x = 0;
+void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){
+	vel.angular.z = rz;
+	vel.linear.x = lx;
 	vel_pub.publish(vel);
 	ros::spinOnce();
 }
@@ -48,6 +48,7 @@ int main(int argc, char **argv)
     std::chrono::time_point<std::chrono::system_clock> start;
     start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
+	uint64_t timeReference = 0;
 
 	imageTransporter rgbTransport("camera/image/", sensor_msgs::image_encodings::BGR8); //--for Webcam
 	//imageTransporter rgbTransport("camera/rgb/image_raw", sensor_msgs::image_encodings::BGR8); //--for turtlebot Camera
@@ -76,18 +77,29 @@ int main(int argc, char **argv)
 				vel_pub.publish(follow_cmd);
 				break;
 			case S_BUMPER:
-				haltMovement(vel, vel_pub);
 				ROS_INFO("BUMPER PRESSED EVENT");
-
+				
 				if(!playingSound){
 					playingSound = true;
 					sc.playWave(path_to_sounds + "Rage.wav");
 				}
+
+				timeReference = secondsElapsed;
+
+				while(secondsElapsed - timeReference < 2){
+					ros::spinOnce();
+					secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
+					setMovement(vel, vel_pub, -0.2, 0);
+				}
+							
+				setMovement(vel, vel_pub, 0, 0);
+				ros::spinOnce();				
 				
 				break;
 			case S_CLIFF:
-				haltMovement(vel, vel_pub);
 				ROS_INFO("CLIFF ACTIVE EVENT");
+
+				setMovement(vel, vel_pub, 0, 0);
 				
 				if(!playingSound){
 					playingSound = true;
@@ -97,10 +109,10 @@ int main(int argc, char **argv)
 
 				break;
 			case S_MICROPHONE:
-				haltMovement(vel, vel_pub);
+				setMovement(vel, vel_pub, 0, 0);
 				break;
 			case S_PLACEHOLDER:
-				haltMovement(vel, vel_pub);
+				setMovement(vel, vel_pub, 0, 0);
 				break;
 		}
 

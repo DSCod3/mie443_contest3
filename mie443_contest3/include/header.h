@@ -48,5 +48,15 @@ extern BumpersStruct bumpers;
 
 #pragma endregion
 
+enum Status {
+    S_FOLLOW,
+    S_BUMPER,
+    S_CLIFF,
+    S_MICROPHONE,
+    S_PLACEHOLDER
+};
+
+extern Status status;
+
 
 #endif

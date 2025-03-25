@@ -12,19 +12,26 @@ geometry_msgs::Twist follow_cmd;
 int world_state;
 Status status;
 bool playingSound;
-bool lostTriggered = false;  // Flag to prevent repeated lost state triggering
-ros::Time lastFollowTime;    // Tracks the time of the last follower command
+bool lostTriggered = false;  // Prevent repeated lost event triggering
+ros::Time lastFollowTime;    // Tracks time of the last follower command
 
-// Follower callback updates the command and resets the lost-tracking flag.
+// Follower callback: update command and reset lost-tracking state.
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
     lastFollowTime = ros::Time::now();
-    lostTriggered = false;  // New follower command resets lost-tracking flag.
+    // If valid movement is detected, revert to follow state.
+    if(fabs(follow_cmd.linear.x) > 0.01 || fabs(follow_cmd.angular.z) > 0.01){
+        status = S_FOLLOW;
+        lostTriggered = false;
+    }
 }
 
-// Microphone callback listens for the phrase "good robot" to trigger infatuation.
+// Microphone callback: using pocketsphinx_ros output on "/recognizer/output".
+// If the recognized text contains "good robot", trigger S_MICROPHONE.
 void microphoneCB(const std_msgs::String::ConstPtr& msg) {
-    if (msg->data.find("good robot") != std::string::npos) {
+    ROS_INFO("Speech recognizer output: %s", msg->data.c_str());
+    // Optionally, add a confidence check if available.
+    if(msg->data.find("good robot") != std::string::npos) {
         ROS_INFO("Heard 'good robot', entering S_MICROPHONE state.");
         status = S_MICROPHONE;
     }
@@ -48,17 +55,16 @@ int main(int argc, char **argv)
     string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
     teleController eStop;
 
-    // Publishers and Subscribers
+    // Publishers and Subscribers.
     ros::Publisher vel_pub = nh.advertise<geometry_msgs::Twist>("cmd_vel_mux/input/teleop", 1);
     ros::Subscriber follower = nh.subscribe("follower_velocity_smoother/smooth_cmd_vel", 10, &followerCB);
     ros::Subscriber bumper = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
     ros::Subscriber cliff_sub = nh.subscribe("/mobile_base/events/cliff", 10, &cliffCallback);
-    ros::Subscriber mic_sub = nh.subscribe("microphone/input", 10, &microphoneCB);
+    // Subscribe to the recognizer output (e.g., from pocketsphinx_ros).
+    ros::Subscriber mic_sub = nh.subscribe("recognizer/output", 10, &microphoneCB);
 
-    // Timer setup
     ros::Rate loop_rate(10);
-    std::chrono::time_point<std::chrono::system_clock> start;
-    start = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::system_clock> start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
     uint64_t timeReference = 0;
 
@@ -72,9 +78,9 @@ int main(int argc, char **argv)
     geometry_msgs::Twist vel;
     vel.angular.z = angular;
     vel.linear.x = linear;
-    
+
     ros::Duration(0.5).sleep();
-    lastFollowTime = ros::Time::now(); // Initialize follow time
+    lastFollowTime = ros::Time::now();
 
     while(ros::ok() && secondsElapsed <= 480){
         ros::spinOnce();
@@ -82,11 +88,10 @@ int main(int argc, char **argv)
         secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
             std::chrono::system_clock::now() - start).count();
 
-        // Check for lost tracking:
-        // If in S_FOLLOW and no new follower command has been received for >3 seconds
-        // OR the follow command is essentially zero, then switch to S_PLACEHOLDER.
-        if(status == S_FOLLOW && ((current_time - lastFollowTime).toSec() > 3.0 ||
-            (fabs(follow_cmd.linear.x) < 0.01 && fabs(follow_cmd.angular.z) < 0.01))){
+        // LOST TRACKING CHECK:
+        // If in S_FOLLOW and no valid follower command for >3 seconds, switch to S_PLACEHOLDER.
+        if(status == S_FOLLOW && (current_time - lastFollowTime).toSec() > 3.0 &&
+           (fabs(follow_cmd.linear.x) < 0.01 && fabs(follow_cmd.angular.z) < 0.01)) {
             status = S_PLACEHOLDER;
         }
 
@@ -103,23 +108,22 @@ int main(int argc, char **argv)
                     playingSound = true;
                     sc.playWave(path_to_sounds + "Rage.wav");
                 }
-                // Move backwards for 2 seconds.
+                // Back up for 2 seconds.
                 timeReference = secondsElapsed;
                 while(secondsElapsed - timeReference < 2){
                     secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
                         std::chrono::system_clock::now() - start).count();
                     setMovement(vel, vel_pub, -0.2, 0);
                 }
-                // Shaking behavior: alternate left/right with increased speed.
+                // Drastic shaking: alternate left/right with very high angular speed.
                 for (int i = 0; i < 3; i++){
                     ROS_INFO("Shaking LEFT");
-                    setMovement(vel, vel_pub, 0, 6.0); // 3× faster angular speed (6.0 rad/s)
-                    ros::Duration(0.17).sleep();       // Reduced duration (~0.17 sec)
+                    setMovement(vel, vel_pub, 0, 6.0); // High speed turning
+                    ros::Duration(0.06).sleep();       // 3x faster than before (~0.06 sec)
                     ROS_INFO("Shaking RIGHT");
                     setMovement(vel, vel_pub, 0, -6.0);
-                    ros::Duration(0.17).sleep();
+                    ros::Duration(0.06).sleep();
                 }
-                // Stop movement after bumper reaction.
                 setMovement(vel, vel_pub, 0, 0);
                 ros::spinOnce();
                 status = S_FOLLOW;  // Revert to follow state.
@@ -129,34 +133,37 @@ int main(int argc, char **argv)
             case S_CLIFF:
                 ROS_INFO("STATE: CLIFF ACTIVE EVENT");
                 setMovement(vel, vel_pub, 0, 0);
-                // Debounce the cliff sensor.
-                timeReference = secondsElapsed;
-                while(secondsElapsed - timeReference < 1){
-                    if(status == S_CLIFF){
-                        secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
-                            std::chrono::system_clock::now() - start).count();
-                        timeReference = secondsElapsed;
-                    }
-                    ros::spinOnce();
-                }
                 if(!playingSound){
                     playingSound = true;
                     sc.playWave(path_to_sounds + "Discontent.wav");
                 }
+                // Revert to follow when cliff condition is cleared.
+                if(!cliffActive){
+                    status = S_FOLLOW;
+                    playingSound = false;
+                }
                 break;
 
             case S_MICROPHONE:
-                ROS_INFO("STATE: MICROPHONE EVENT - HEARD GOOD ROBOT (INFATUATED)");
+                ROS_INFO("STATE: MICROPHONE EVENT - INFATUATED (GOOD ROBOT)");
                 if(!playingSound){
                     playingSound = true;
                     sc.playWave(path_to_sounds + "Infatuated.wav");
                 }
                 setMovement(vel, vel_pub, 0, 0);
-                status = S_FOLLOW;  // Revert to follow after processing microphone input.
+                status = S_FOLLOW;
                 playingSound = false;
                 break;
 
             case S_PLACEHOLDER:
+                // Lost Tracking state: if a valid command is received, revert to follow.
+                if(fabs(follow_cmd.linear.x) > 0.01 || fabs(follow_cmd.angular.z) > 0.01){
+                    ROS_INFO("FOUND TARGET, reverting to S_FOLLOW");
+                    status = S_FOLLOW;
+                    lostTriggered = false;
+                    playingSound = false;
+                    break;
+                }
                 ROS_INFO("STATE: LOST TRACKING - SEARCHING");
                 if(!lostTriggered){
                     if(!playingSound){

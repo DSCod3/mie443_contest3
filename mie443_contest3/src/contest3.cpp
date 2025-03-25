@@ -73,6 +73,7 @@ int main(int argc, char **argv)
 
 		switch(status){
 			case S_FOLLOW:
+				ROS_INFO("S_FOLLOW");
 				playingSound = false;
 				vel_pub.publish(follow_cmd);
 				break;

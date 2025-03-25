@@ -4,7 +4,6 @@ uint8_t bumper[3] = {kobuki_msgs::BumperEvent::RELEASED, kobuki_msgs::BumperEven
 BumpersStruct bumpers;
 
 void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
-
     ROS_INFO("Bumper callback triggered.");
 
     bumper[msg->bumper] = msg->state;
@@ -17,10 +16,16 @@ void bumperCallback(const kobuki_msgs::BumperEvent::ConstPtr& msg){
     // Update Status
     if(bumpers.anyPressed && status == S_FOLLOW){
         status = S_BUMPER;
+        ROS_INFO("Bumper callback triggered HIGH.");
+    }
+    else if (!bumpers.anyPressed && status == S_BUMPER){
+        status = S_FOLLOW;
+    }
+
+    if(bumpers.anyPressed){
+        ROS_INFO("True");
     }
     else{
-        if(status == S_BUMPER){
-            status = S_FOLLOW;
-        }
+        ROS_INFO("False");
     }
 }

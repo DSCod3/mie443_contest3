@@ -77,7 +77,7 @@ int SoundDirectionDetector::audioCallback(const void* inputBuffer,
 
 void SoundDirectionDetector::calibrateChannels() {
     // Collect some silent samples first
-    ros::Duration(0.5).sleep();
+    ros::WallDuration(0.5).sleep();
     
     float sum0 = std::accumulate(audioBuffers_[0].begin(), audioBuffers_[0].end(), 0.0f);
     float sum1 = std::accumulate(audioBuffers_[1].begin(), audioBuffers_[1].end(), 0.0f);
@@ -130,10 +130,13 @@ float SoundDirectionDetector::getSoundDirection() {
 }
 
 void SoundDirectionDetector::run() {
-    ros::NodeHandle nh;
+    ros::NodeHandle nh;  // MUST CREATE NODEHANDLE FIRST
     ros::Publisher dir_pub = nh.advertise<std_msgs::String>("/sound_direction", 10);
     std_msgs::String dir_msg;
 
+    // Calibrate after nodehandle exists
+    calibrateChannels(); 
+    
     Pa_StartStream(stream_);
     ROS_INFO("Sound direction detection ready (Threshold: %.1f dB)", DB_THRESHOLD);
 

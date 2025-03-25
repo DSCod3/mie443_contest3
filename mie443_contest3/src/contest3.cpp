@@ -2,6 +2,9 @@
 #include <ros/package.h>
 #include <imageTransporter.hpp>
 #include <chrono>
+#include <bumper.h>
+#include <cliff.h>
+#include <sound_direction.h>
 
 using namespace std;
 
@@ -12,9 +15,9 @@ void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
 }
 
-void bumperCB(const geometry_msgs::Twist msg){
-    //Fill with code
-}
+// void bumperCB(const geometry_msgs::Twist msg){
+//     //Fill with code
+// }
 
 //-------------------------------------------------------------
 
@@ -31,7 +34,8 @@ int main(int argc, char **argv)
 
 	//subscribers
 	ros::Subscriber follower = nh.subscribe("follower_velocity_smoother/smooth_cmd_vel", 10, &followerCB);
-	ros::Subscriber bumper = nh.subscribe("mobile_base/events/bumper", 10, &bumperCB);
+	ros::Subscriber bumper = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
+	ros::Subscriber cliff_sub = nh.subscribe("/mobile_base/events/cliff", 10, &cliffCallback);
 
     // contest count down timer
 	ros::Rate loop_rate(10);
@@ -57,6 +61,19 @@ int main(int argc, char **argv)
 
 	while(ros::ok() && secondsElapsed <= 480){		
 		ros::spinOnce();
+
+		if(cliffActive){
+			ROS_INFO("CLIFF ACTIVE EVENT");
+			sc.playWave(path_to_sounds + "sound.wav");
+		}
+
+		if(bumpers.anyPressed){
+			ROS_INFO("BUMPER PRESSED EVENT");
+			sc.playWave(path_to_sounds + "sound.wav");
+		}
+
+
+
 
 		if(world_state == 0){
 			//fill with your code

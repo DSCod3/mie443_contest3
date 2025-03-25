@@ -1,6 +1,6 @@
 #include "sound_direction.h"
 #include <cmath>
-#include <algorithm>
+#include <numeric>
 
 SoundDirectionDetector::SoundDirectionDetector() :
     stream_(nullptr),
@@ -8,6 +8,7 @@ SoundDirectionDetector::SoundDirectionDetector() :
     channels_(4)
 {
     audioBuffers_.resize(channels_);
+    angleHistory.fill(0.0f);
 }
 
 SoundDirectionDetector::~SoundDirectionDetector() {
@@ -50,6 +51,7 @@ bool SoundDirectionDetector::initialize() {
         return false;
     }
 
+    calibrateChannels();
     return true;
 }
 
@@ -73,6 +75,16 @@ int SoundDirectionDetector::audioCallback(const void* inputBuffer,
     return paContinue;
 }
 
+void SoundDirectionDetector::calibrateChannels() {
+    // Collect some silent samples first
+    ros::Duration(0.5).sleep();
+    
+    float sum0 = std::accumulate(audioBuffers_[0].begin(), audioBuffers_[0].end(), 0.0f);
+    float sum1 = std::accumulate(audioBuffers_[1].begin(), audioBuffers_[1].end(), 0.0f);
+    channelBalance = (sum1 != 0) ? sum0/sum1 : 1.0f;
+    ROS_INFO("Channel balance calibrated: %.2f", channelBalance);
+}
+
 float SoundDirectionDetector::calculateVolumeDB(int channel) {
     if(audioBuffers_[channel].empty()) return -INFINITY;
     
@@ -81,7 +93,7 @@ float SoundDirectionDetector::calculateVolumeDB(int channel) {
         sum += sample * sample;
     }
     float rms = sqrt(sum / audioBuffers_[channel].size());
-    return 20.0f * log10(rms + 1e-9f);  // Add epsilon to avoid log(0)
+    return 20.0f * log10(rms + 1e-9f);
 }
 
 float SoundDirectionDetector::getSoundDirection() {
@@ -95,7 +107,11 @@ float SoundDirectionDetector::getSoundDirection() {
     for(int lag = -maxLag; lag <= maxLag; lag++) {
         float corr = 0.0f;
         for(int i = maxLag; i < 1024 - maxLag; i++) {
-            corr += audioBuffers_[0][i] * audioBuffers_[1][i + lag];
+            // Apply Hann window and calibration
+            float window = 0.5f * (1 - cos(2*M_PI*i/(1024-1)));
+            float sample0 = audioBuffers_[0][i] * window * channelBalance;
+            float sample1 = audioBuffers_[1][i + lag] * window;
+            corr += sample0 * sample1;
         }
         if(corr > maxCorr) {
             maxCorr = corr;
@@ -106,33 +122,56 @@ float SoundDirectionDetector::getSoundDirection() {
     float timeDiff = static_cast<float>(bestLag)/sampleRate_;
     float sin_theta = (timeDiff * SOUND_SPEED) / MIC_SPACING;
     sin_theta = std::max(-1.0f, std::min(sin_theta, 1.0f));
-    
-    return asin(sin_theta);
+    float angle = asin(sin_theta);
+
+    // Apply smoothing
+    angleHistory[historyIndex++ % HISTORY_SIZE] = angle;
+    return std::accumulate(angleHistory.begin(), angleHistory.end(), 0.0f) / HISTORY_SIZE;
 }
 
 void SoundDirectionDetector::run() {
     ros::NodeHandle nh;
     ros::Publisher dir_pub = nh.advertise<std_msgs::String>("/sound_direction", 10);
-    
     std_msgs::String dir_msg;
+
     Pa_StartStream(stream_);
-    ROS_INFO("Sound direction detection started (Threshold: %.1f dB)", DB_THRESHOLD);
+    ROS_INFO("Sound direction detection ready (Threshold: %.1f dB)", DB_THRESHOLD);
 
     while(ros::ok()) {
         ros::spinOnce();
         
         float volume_db = calculateVolumeDB(0);
-        if(volume_db > DB_THRESHOLD) {
-            float angle = getSoundDirection();
-            dir_msg.data = (angle > 0) ? "RIGHT" : "LEFT";
-            dir_pub.publish(dir_msg);
-            ROS_INFO("Direction: %s (%.1f dB)", dir_msg.data.c_str(), volume_db);
+        
+        if(soundActive) {
+            if((ros::Time::now() - eventStart).toSec() > EVENT_WINDOW) {
+                soundActive = false;
+                
+                if(abs(leftCount - rightCount) >= MIN_DOMINANCE) {
+                    dir_msg.data = (leftCount > rightCount) ? "LEFT" : "RIGHT";
+                    dir_pub.publish(dir_msg);
+                    ROS_INFO("Direction: %s (L:%d R:%d)", 
+                            dir_msg.data.c_str(), leftCount, rightCount);
+                }
+                else {
+                    ROS_DEBUG("Ambiguous sound ignored (L:%d R:%d)", leftCount, rightCount);
+                }
+                
+                leftCount = 0;
+                rightCount = 0;
+            }
+            else {
+                float angle = getSoundDirection();
+                if(angle < -0.087f) leftCount++;  // -5 degrees threshold
+                else if(angle > 0.087f) rightCount++;
+            }
         }
-        else {
-            ROS_DEBUG_THROTTLE(5.0, "Background noise: %.1f dB", volume_db);
+        else if(volume_db > DB_THRESHOLD) {
+            soundActive = true;
+            eventStart = ros::Time::now();
+            ROS_DEBUG("New sound event started");
         }
         
-        usleep(10000);  // 10ms update rate
+        usleep(10000);
     }
 }
 

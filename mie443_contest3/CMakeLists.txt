@@ -34,22 +34,22 @@ link_directories(${PORTAUDIO_LIBRARY_DIRS})
 # Catkin package setup
 catkin_package()
 
-# Sound direction node
-add_executable(sound_direction
-    src/sound_direction.cpp
+# Sound detection node - FIXED TARGET NAME
+add_executable(sound_detection
+    src/sound_detection.cpp
 )
-target_compile_options(sound_direction PRIVATE
+target_compile_options(sound_detection PRIVATE  # Changed from sound_direction
     -O3
     -march=native
     -ffast-math
     -flto
 )
-target_link_libraries(sound_direction
+target_link_libraries(sound_detection  # Changed from sound_direction
     ${catkin_LIBRARIES}
     ${PORTAUDIO_LIBRARIES}
     pthread
 )
-set_target_properties(sound_direction PROPERTIES
+set_target_properties(sound_detection PROPERTIES  # Changed from sound_direction
     CXX_STANDARD 14
     CXX_STANDARD_REQUIRED ON
 )

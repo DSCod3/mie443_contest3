@@ -28,10 +28,16 @@ void fearCheckCallback(const sensor_msgs::ImageConstPtr& msg){
         double motion = cv::mean(diff)[0];
         
         // 当检测到突然的大幅度运动时触发
-        if(motion > 30 && status == S_FOLLOW){ // 阈值需要根据实际情况调整
+        if(motion > 10 && status == S_FOLLOW){ // 阈值需要根据实际情况调整
             fearActive = true;
             fearStartTime = ros::Time::now();
+            status = S_FEAR;
+            
         }
+        else if(status == S_FEAR){
+            status = S_FOLLOW;
+        }
+        
     }
     prev_frame = cv_ptr->image.clone();
 }

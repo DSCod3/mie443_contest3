@@ -86,13 +86,13 @@ int main(int argc, char **argv)
 
 		switch(status){
 			case S_FOLLOW:
-				ROS_INFO("S_FOLLOW");
+				// ROS_INFO("S_FOLLOW");
 				playingSound = false;
 				vel_pub.publish(follow_cmd);
 				break;
 				
 			case S_BUMPER:
-				ROS_INFO("BUMPER PRESSED EVENT");
+				// ROS_INFO("BUMPER PRESSED EVENT");
 				
 				if(!playingSound){
 					playingSound = true;
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
 				break;
 
 			case S_CLIFF:
-				ROS_INFO("CLIFF ACTIVE EVENT");
+				// ROS_INFO("CLIFF ACTIVE EVENT");
 
 				setMovement(vel, vel_pub, 0, 0);
 				

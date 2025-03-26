@@ -98,7 +98,7 @@ int main(int argc, char **argv)
 
 
 				////////handle lost
-				if (msg.linear.x == 0 && msg.angular.z == 0) {
+				if (follow_cmd.linear.x == 0 && follow_cmd.angular.z == 0) {
 					stop_count++;
 				} else {
 					stop_count = 0; // Reset if the robot moves again

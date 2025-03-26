@@ -18,8 +18,9 @@ target_link_libraries(publisher ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 # add the subscriber example
 add_executable(contest3 src/contest3.cpp
-			src/imageTransporter.cpp src/bumper.cpp src/cliff.cpp)
+			src/imageTransporter.cpp src/bumper.cpp src/cliff.cpp/fear.cpp)
 target_link_libraries(contest3 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")

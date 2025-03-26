@@ -11,7 +11,7 @@ using namespace std;
 geometry_msgs::Twist follow_cmd;
 int world_state;
 Status status;
-bool playingSound = false;  // 已有但需要确认
+bool playingSound = false;
 
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;

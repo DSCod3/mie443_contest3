@@ -14,16 +14,18 @@ void fearCheckCallback(const geometry_msgs::Twist::ConstPtr& msg){
     if(msg->linear.x < -0.01) {
         if(!isBacking) {
             fearStartTime = ros::Time::now();
-            isBacking = true;
+            // isBacking = true;
+            ros::Duration duration = ros::Time::now() - fearStartTime;
+            if(duration.toSec() > 2.0 && status == S_FOLLOW) {
+                fearActive = true;
+                status = S_FEAR;
+                isBacking = true;
+            }
             ROS_INFO("BACKING UP ACTIVATED");
         }
         
         // 检查持续时间是否超过3秒
-        ros::Duration duration = ros::Time::now() - fearStartTime;
-        if(duration.toSec() > 2.0 && status == S_FOLLOW) {
-            fearActive = true;
-            status = S_FEAR;
-        }
+        
     } else {
         isBacking = false;
         if(status == S_FEAR) {

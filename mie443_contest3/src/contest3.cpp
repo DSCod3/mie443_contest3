@@ -86,6 +86,19 @@ int main(int argc, char **argv)
 				playingSound = false;
 
 				vel_pub.publish(follow_cmd);
+
+				// Play fear sound when backing up
+				if (follow_cmd.linear.x < -0.01) {
+					fearStartTime = ros::Time::now();
+					// isBacking = true;
+					ros::Duration duration = ros::Time::now() - fearStartTime;
+					if(duration.toSec() > 2.0 && !backingSoundPlayed) {
+						sc.playWave(path_to_sounds + "Sad_SPBB.wav");
+						backingSoundPlayed = true;
+					}
+				} else {
+					backingSoundPlayed = false;
+				}
 				break;
 				
 			case S_BUMPER:

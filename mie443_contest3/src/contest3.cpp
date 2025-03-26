@@ -19,7 +19,7 @@ void handleLostTrack(){
 	ROS_INFO("Robot lost track.");
     sound_play::SoundClient sc;
     string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
-    sc.playWave(path_to_sounds + "Sad_SPBB.wav");  // Change path
+    
 }
 
 void followerCB(const geometry_msgs::Twist msg){
@@ -108,6 +108,7 @@ int main(int argc, char **argv)
 				if (stop_count > 5) { // Adjust threshold based on responsiveness needs
 					handleLostTrack();
 					stop_count = 0; // Reset count after handling
+					sc.playWave(path_to_sounds + "Sad_SPBB.wav");  // Change path
 				}
 
 

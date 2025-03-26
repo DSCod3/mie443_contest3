@@ -47,7 +47,7 @@ void handleFearState(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, sound_p
         vel_pub.publish(vel);
         
         if(!fearSoundPlayed){
-            sc.playWave(path + "fear.wav");
+            sc.playWave(path + "Sad_SPBB.wav");
             fearSoundPlayed = true;
         }
     } else {

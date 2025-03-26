@@ -19,7 +19,7 @@ void handleLostTrack(){
 	ROS_INFO("Robot lost track.");
     sound_play::SoundClient sc;
     string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
-    sc.playWave(path_to_sounds + "Rage.wav");  // Change path
+    sc.playWave(path_to_sounds + "Sad_SPBB.wav");  // Change path
 }
 
 void followerCB(const geometry_msgs::Twist msg){
@@ -228,7 +228,7 @@ int main(int argc, char **argv)
 			}
 
 			case S_PLACEHOLDER:{
-				setMovement(vel, vel_pub, 0, 0);
+				handleLostTrack();
 				break;
 			}
 		}

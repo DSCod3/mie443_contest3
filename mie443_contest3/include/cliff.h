@@ -5,6 +5,6 @@
 
 extern bool cliffActive;
 
-void cliffCallback(const kobuki_msgs::CliffEvent::ConstPtr& msg);
+void cliffCallback(const kobuki_msgs::SensorState::ConstPtr& msg);
 
 #endif

@@ -2,21 +2,19 @@
 
 bool cliffActive = false;
 
-void cliffCallback(const kobuki_msgs::CliffEvent::ConstPtr& msg) {
+void cliffCallback(const kobuki_msgs::SensorState::ConstPtr& msg) {
 
-    ROS_INFO("Cliff callback triggered.");
+    cliffActive = (msg->cliff & kobuki_msgs::SensorState::CLIFF_LEFT || msg->cliff & kobuki_msgs::SensorState::CLIFF_CENTRE || msg->cliff & kobuki_msgs::SensorState::CLIFF_RIGHT);
 
-    if (msg->state == kobuki_msgs::CliffEvent::CLIFF) {
-        cliffActive = true;
+    if (cliffActive) {
+        // ROS_INFO("Robot off floor.");
         if(status == S_FOLLOW){
             status = S_CLIFF;
         }
-        
     }
 
     else{
-        cliffActive = false;
-
+        // ROS_INFO("Robot on floor.");
         if(status == S_CLIFF){
             status = S_FOLLOW;
         }

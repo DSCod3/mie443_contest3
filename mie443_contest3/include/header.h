@@ -30,6 +30,8 @@
 
 #include <kobuki_msgs/BumperEvent.h>
 #include <kobuki_msgs/CliffEvent.h>
+#include <kobuki_msgs/SensorState.h>
+
 
 
 
@@ -52,11 +54,12 @@ enum Status {
     S_FOLLOW,
     S_BUMPER,
     S_CLIFF,
+    S_ESCAPE,
     S_MICROPHONE,
     S_PLACEHOLDER
 };
 
 extern Status status;
-
+extern bool playingSound;  // 添加
 
 #endif

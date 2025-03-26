@@ -27,17 +27,7 @@ void followerCB(const geometry_msgs::Twist msg){
 	// for test
 	ROS_INFO("x, y, z: [%f, %f, %f]", msg.linear.x, msg.linear.y, msg.angular.z);
 	//ROS_INFO("Angular: [%f, %f, %f]", msg.angular.x, msg.angular.y, msg.angular.z);
-    if (msg.linear.x == 0 && msg.angular.z == 0) {
-        stop_count++;
-    } else {
-        stop_count = 0; // Reset if the robot moves again
-    }
-	ROS_INFO("STOP COUNT: %d", stop_count);
-
-    if (stop_count > 5) { // Adjust threshold based on responsiveness needs
-        handleLostTrack();
-        stop_count = 0; // Reset count after handling
-    }
+    
 }
 
 void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){
@@ -105,6 +95,22 @@ int main(int argc, char **argv)
 			case S_FOLLOW:
 			{
 				ROS_INFO("S_FOLLOW");
+
+
+				////////handle lost
+				if (msg.linear.x == 0 && msg.angular.z == 0) {
+					stop_count++;
+				} else {
+					stop_count = 0; // Reset if the robot moves again
+				}
+				ROS_INFO("STOP COUNT: %d", stop_count);
+			
+				if (stop_count > 5) { // Adjust threshold based on responsiveness needs
+					handleLostTrack();
+					stop_count = 0; // Reset count after handling
+				}
+
+
 				playingSound = false;
 			
 				vel_pub.publish(follow_cmd);

@@ -139,7 +139,7 @@ int main(int argc, char **argv)
 				
 				if(!playingSound){
 					playingSound = true;
-					sc.playWave(path_to_sounds + "Rage.wav");
+					sc.playWave(path_to_sounds + "Angry.wav");
 				}
 
 				timeReference = secondsElapsed;
@@ -198,7 +198,7 @@ int main(int argc, char **argv)
 
 				if(!playingSound){
 					playingSound = true;
-					sc.playWave(path_to_sounds + "Discontent.wav");
+					sc.playWave(path_to_sounds + "Suprised.wav");
 				}
 				
 				// Cliff sensor needs to be debounced. 

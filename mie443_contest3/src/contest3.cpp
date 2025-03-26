@@ -9,13 +9,35 @@ using namespace std;
 
 geometry_msgs::Twist follow_cmd;
 int world_state;
+int stop_count = 0;
 Status status;
 bool playingSound = false;
 
 
 
+void handleLostTrack(){
+	ROS_INFO("Robot lost track.");
+    sound_play::SoundClient sc;
+    string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
+    sc.playWave(path_to_sounds + "Rage.wav");  // Change path
+}
+
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
+	// for test
+	ROS_INFO("x, y, z: [%f, %f, %f]", msg.linear.x, msg.linear.y, msg.angular.z);
+	//ROS_INFO("Angular: [%f, %f, %f]", msg.angular.x, msg.angular.y, msg.angular.z);
+    if (msg.linear.x == 0 && msg.angular.z == 0) {
+        stop_count++;
+    } else {
+        stop_count = 0; // Reset if the robot moves again
+    }
+	ROS_INFO("STOP COUNT: %d", stop_count);
+
+    if (stop_count > 5) { // Adjust threshold based on responsiveness needs
+        handleLostTrack();
+        stop_count = 0; // Reset count after handling
+    }
 }
 
 void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){

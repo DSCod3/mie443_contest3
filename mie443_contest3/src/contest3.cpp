@@ -13,20 +13,27 @@ Status status;
 bool playingSound;
 
 void handleLostTrack(){
-	ROS_INFO("Robot Lost Track");
-	sound_play::SoundClient sc;
-	string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
-	sc.playWave(path_to_sounds + "sound.wav");
+	ROS_INFO("Robot lost track.");
+    sound_play::SoundClient sc;
+    string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
+    sc.playWave(path_to_sounds + "sound.wav");  // Change path
 }
 
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
+	// for test
 	ROS_INFO("Linear: [%f, %f, %f]", msg.linear.x, msg.linear.y, msg.linear.z);
 	ROS_INFO("Angular: [%f, %f, %f]", msg.angular.x, msg.angular.y, msg.angular.z);
-	// one time check
-	if (msg.linear.x == 0 && msg.angular.z == 0){
-		handleLostTrack;
-	}
+    if (msg.linear.x == 0 && msg.linear.y == 0 && msg.angular.z == 0) {
+        stop_count++;
+    } else {
+        stop_count = 0; // Reset if the robot moves again
+    }
+
+    if (stop_count > 3) { // Adjust threshold based on responsiveness needs
+        handleLostTrack();
+        stop_count = 0; // Reset count after handling
+    }
 }
 
 void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){

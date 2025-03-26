@@ -12,8 +12,18 @@ int world_state;
 Status status;
 bool playingSound;
 
+void handleLostTrack(){
+	ROS_INFO("Robot Lost Track");
+	sound_play::SoundClient sc;
+	string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
+	sc.playWave(path_to_sounds + "sound.wav");
+}
+
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
+	if (msg.linear.x == 0 && msg.angular.z == 0){
+		handleLostTrack;
+	}
 }
 
 void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){

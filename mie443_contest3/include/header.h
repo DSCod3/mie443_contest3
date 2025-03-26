@@ -30,6 +30,7 @@
 
 #include <kobuki_msgs/BumperEvent.h>
 #include <kobuki_msgs/CliffEvent.h>
+#include <kobuki_msgs/SensorState.h>
 
 
 

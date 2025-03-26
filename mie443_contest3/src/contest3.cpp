@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 	//subscribers
 	ros::Subscriber follower = nh.subscribe("follower_velocity_smoother/smooth_cmd_vel", 10, &followerCB);
 	ros::Subscriber bumper = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
-	ros::Subscriber cliff_sub = nh.subscribe("/mobile_base/events/cliff", 10, &cliffCallback);
+	ros::Subscriber cliff_sub = nh.subscribe("/mobile_base/sensors/core", 10, &cliffCallback);
 
     // contest count down timer
 	ros::Rate loop_rate(10);
@@ -76,17 +76,19 @@ int main(int argc, char **argv)
 			case S_FOLLOW:
 				ROS_INFO("S_FOLLOW");
 				playingSound = false;
-				vel_pub.publish(follow_cmd);
 
 				// Play fear sound when backing up
 				if (follow_cmd.linear.x < 0) {
 					if (!backingSoundPlayed) {
 						sc.playWave(path_to_sounds + "Fear_Heavy_Breath.wav");
+						ROS_INFO("Moving backwards, supposed to play fear.");
 						backingSoundPlayed = true;
 					}
 				} else {
 					backingSoundPlayed = false;
 				}
+
+				vel_pub.publish(follow_cmd);
 				break;
 				
 			case S_BUMPER:

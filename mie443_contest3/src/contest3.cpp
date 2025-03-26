@@ -21,6 +21,9 @@ void handleLostTrack(){
 
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
+	ROS_INFO("Linear: [%f, %f, %f]", msg.linear.x, msg.linear.y, msg.linear.z);
+	ROS_INFO("Angular: [%f, %f, %f]", msg.angular.x, msg.angular.y, msg.angular.z);
+	// one time check
 	if (msg.linear.x == 0 && msg.angular.z == 0){
 		handleLostTrack;
 	}

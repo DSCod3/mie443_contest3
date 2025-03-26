@@ -54,7 +54,6 @@ enum Status {
     S_FOLLOW,
     S_BUMPER,
     S_CLIFF,
-    S_FEAR,
     S_MICROPHONE,
     S_PLACEHOLDER
 };

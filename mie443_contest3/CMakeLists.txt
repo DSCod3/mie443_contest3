@@ -6,7 +6,6 @@ find_package(OpenCV 3 REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
 		cv_bridge 
 		image_transport 
-		sound_play  # 必须添加
 		sensor_msgs)
 
 catkin_package()
@@ -19,7 +18,7 @@ target_link_libraries(publisher ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 # add the subscriber example
 add_executable(contest3 src/contest3.cpp
-			src/imageTransporter.cpp src/bumper.cpp src/cliff.cpp src/fear.cpp)
+			src/imageTransporter.cpp src/bumper.cpp src/cliff.cpp)
 target_link_libraries(contest3 ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 

@@ -77,9 +77,6 @@ int main(int argc, char **argv)
 
 		switch(status){
 
-			case S_FEAR:
-				handleFearState(vel, vel_pub, sc, path_to_sounds);
-				break;
 
 			case S_FOLLOW:
 				ROS_INFO("S_FOLLOW");
@@ -88,15 +85,23 @@ int main(int argc, char **argv)
 				vel_pub.publish(follow_cmd);
 
 				// Play fear sound when backing up
+				static ros::Time backupStartTime;  // 使用static变量保持计时
+				static bool isCounting = false;    // 添加计时状态标志
+				
 				if (follow_cmd.linear.x < -0.01) {
-					fearStartTime = ros::Time::now();
-					// isBacking = true;
-					ros::Duration duration = ros::Time::now() - fearStartTime;
-					if(duration.toSec() > 2.0 && !backingSoundPlayed) {
+					if (!isCounting) {  // 首次检测到后退时记录开始时间
+						backupStartTime = ros::Time::now();
+						isCounting = true;
+					}
+					
+					ros::Duration duration = ros::Time::now() - backupStartTime;
+					if (duration.toSec() > 2.0 && !backingSoundPlayed) {
 						sc.playWave(path_to_sounds + "Sad_SPBB.wav");
 						backingSoundPlayed = true;
 					}
 				} else {
+					// 停止后退时重置计时器和标志
+					isCounting = false;
 					backingSoundPlayed = false;
 				}
 				break;

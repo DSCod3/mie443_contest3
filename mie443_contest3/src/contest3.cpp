@@ -25,7 +25,7 @@ void handleLostTrack(ros::Publisher &vel_pub, geometry_msgs::Twist &vel) {
     ROS_INFO("Robot lost track. Rotating in place to search for target.");
     sound_play::SoundClient sc;
     string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
-    sc.playWave(path_to_sounds + "Sad_SPBB.wav");
+    sc.playWave(path_to_sounds + "Sad Violin Sound Effect.wav");
     auto rotationStart = std::chrono::system_clock::now();
     while(ros::ok() && std::chrono::duration_cast<std::chrono::seconds>(
           std::chrono::system_clock::now() - rotationStart).count() < 3) {
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
 				
                 if(!playingSound){
                     playingSound = true;
-                    sc.playWave(path_to_sounds + "Angry.wav");
+                    sc.playWave(path_to_sounds + "Anger Management.wav");
                 }
 
                 timeReference = secondsElapsed;

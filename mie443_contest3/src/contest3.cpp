@@ -110,6 +110,24 @@ int main(int argc, char **argv)
 							sc.playWave(path_to_sounds + "fear_scream.wav");
 							backingSoundPlayed = true;
 							ROS_WARN("Fear sound triggered after 3s");
+
+							//esapce away
+							ros::Duration escapeDuration = ros::Time::now() - escapeStartTime;
+    
+							if(escapeDuration < ros::Duration(2.0)) {
+								// 第一阶段：快速旋转
+								setMovement(vel, vel_pub, 0.0, 1.5);  // 原地旋转
+							}
+							else if(escapeDuration < ros::Duration(4.0)) {
+								// 第二阶段：直线逃跑
+								setMovement(vel, vel_pub, 0.5, 0.0);  // 快速前进
+							}
+							else {
+								// 逃跑结束恢复跟随
+								status = S_FOLLOW;
+								playingSound = false;
+								setMovement(vel, vel_pub, 0.0, 0.0);  // 停止运动
+							}
 						}
 					}
 				} else {

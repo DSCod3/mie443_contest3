@@ -95,7 +95,7 @@ int main(int argc, char **argv)
         if(status == S_FOLLOW && stop_count > 5 && !lostTriggered) {
             lostTriggered = true;
             handleLostTrack();
-            sc.playWave(path_to_sounds + "Sad_SPBB.wav");  // Use a gentle, sad sound.
+            sc.playWave(path_to_sounds + "Sad Violin Sound Effect.wav");  // Use a gentle, sad sound.
             status = S_PLACEHOLDER;
         }
 
@@ -118,7 +118,7 @@ int main(int argc, char **argv)
                 
                 if(!playingSound){
                     playingSound = true;
-                    sc.playWave(path_to_sounds + "Angry.wav");  // Use a deep, grumbling sound for anger.
+                    sc.playWave(path_to_sounds + "Anger Management.wav");  // Use a deep, grumbling sound for anger.
                 }
 
                 timeReference = secondsElapsed;

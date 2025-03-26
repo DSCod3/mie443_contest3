@@ -4,7 +4,6 @@
 #include <chrono>
 #include <bumper.h>
 #include <cliff.h>
-#include <fear.h>
 
 using namespace std;
 
@@ -45,7 +44,6 @@ int main(int argc, char **argv)
 	ros::Subscriber follower = nh.subscribe("follower_velocity_smoother/smooth_cmd_vel", 10, &followerCB);
 	ros::Subscriber bumper = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
 	ros::Subscriber cliff_sub = nh.subscribe("/mobile_base/sensors/core", 10, &cliffCallback);
-	ros::Subscriber fear_sub = nh.subscribe("cmd_vel", 1, &fearCheckCallback);
 
 
     // contest count down timer

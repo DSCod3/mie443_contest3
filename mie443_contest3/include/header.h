@@ -34,6 +34,7 @@
 
 
 
+
 #pragma region Bumper
 
 extern uint8_t bumper[3];
@@ -59,6 +60,6 @@ enum Status {
 };
 
 extern Status status;
-
+extern bool playingSound;  // 添加
 
 #endif

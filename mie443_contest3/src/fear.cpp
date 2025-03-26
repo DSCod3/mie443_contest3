@@ -1,6 +1,10 @@
 #include <fear.h>
 #include <imageTransporter.hpp>
 #include <opencv2/opencv.hpp>
+#include "header.h"  // 添加
+
+extern Status status;        // 添加
+extern bool playingSound;    // 添加
 
 bool fearActive = false;
 ros::Time fearStartTime;

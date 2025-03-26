@@ -13,6 +13,8 @@ int world_state;
 Status status;
 bool playingSound = false;
 
+
+
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
 }
@@ -53,6 +55,9 @@ int main(int argc, char **argv)
     uint64_t secondsElapsed = 0;
 	uint64_t timeReference = 0;
 	bool backingSoundPlayed = false; // Add this with other global variables
+	ros::Time backupStartTime;
+	bool isCounting = false;
+	ros::Duration debounceDuration(0.5); // 防抖动时间窗口
 
 	imageTransporter rgbTransport("camera/image/", sensor_msgs::image_encodings::BGR8); //--for Webcam
 	//imageTransporter rgbTransport("camera/rgb/image_raw", sensor_msgs::image_encodings::BGR8); //--for turtlebot Camera
@@ -81,29 +86,46 @@ int main(int argc, char **argv)
 			case S_FOLLOW:
 				ROS_INFO("S_FOLLOW");
 				playingSound = false;
-
+			
 				vel_pub.publish(follow_cmd);
-
-				// Play fear sound when backing up
-				static ros::Time backupStartTime;  // 使用static变量保持计时
-				static bool isCounting = false;    // 添加计时状态标志
+			
+				// 防抖动检测后退状态
+				static bool last_back_state = false;
+				bool current_back_state = (follow_cmd.linear.x < -0.01);
 				
-				if (follow_cmd.linear.x < -0.01) {
-					if (!isCounting) {  // 首次检测到后退时记录开始时间
-						backupStartTime = ros::Time::now();
-						isCounting = true;
-					}
-					
-					ros::Duration duration = ros::Time::now() - backupStartTime;
-					if (duration.toSec() > 2.0 && !backingSoundPlayed) {
-						sc.playWave(path_to_sounds + "Sad_SPBB.wav");
-						backingSoundPlayed = true;
+				// 状态变化检测（正向或负向边沿）
+				if(current_back_state != last_back_state) {
+					backupStartTime = ros::Time::now(); // 重置计时器当状态变化
+				}
+				
+				if(current_back_state) {
+					// 持续检测时间（包含防抖动）
+					if((ros::Time::now() - backupStartTime) > debounceDuration) {
+						// 有效持续后退开始计时
+						if(!isCounting) {
+							backupStartTime = ros::Time::now();
+							isCounting = true;
+							ROS_INFO("Real backing started");
+						}
+						
+						// 主计时检测（3秒触发）
+						if((ros::Time::now() - backupStartTime).toSec() > 3.0 && !backingSoundPlayed) {
+							sc.playWave(path_to_sounds + "Sad_SPBB.wav");
+							backingSoundPlayed = true;
+							ROS_WARN("Fear sound triggered after 3s");
+						}
 					}
 				} else {
-					// 停止后退时重置计时器和标志
+					// 重置所有状态
 					isCounting = false;
+					if(backingSoundPlayed) {
+						// 添加冷却时间（5秒内不再触发）
+						backupStartTime = ros::Time::now() - ros::Duration(5.0); 
+					}
 					backingSoundPlayed = false;
 				}
+				
+				last_back_state = current_back_state;
 				break;
 				
 			case S_BUMPER:

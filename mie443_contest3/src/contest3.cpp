@@ -110,24 +110,8 @@ int main(int argc, char **argv)
 							sc.playWave(path_to_sounds + "fear_scream.wav");
 							backingSoundPlayed = true;
 							ROS_WARN("Fear sound triggered after 3s");
-
-							//esapce away
-							ros::Duration escapeDuration = ros::Time::now() - escapeStartTime;
-    
-							if(escapeDuration < ros::Duration(2.0)) {
-								// 第一阶段：快速旋转
-								setMovement(vel, vel_pub, 0.0, 1.5);  // 原地旋转
-							}
-							else if(escapeDuration < ros::Duration(4.0)) {
-								// 第二阶段：直线逃跑
-								setMovement(vel, vel_pub, 0.5, 0.0);  // 快速前进
-							}
-							else {
-								// 逃跑结束恢复跟随
-								status = S_FOLLOW;
-								playingSound = false;
-								setMovement(vel, vel_pub, 0.0, 0.0);  // 停止运动
-							}
+							status = S_ESCAPE;  // 满足条件进入逃跑状态
+							escapeStartTime = ros::Time::now();
 						}
 					}
 				} else {
@@ -145,6 +129,12 @@ int main(int argc, char **argv)
 			}
 			case S_BUMPER:{
 				ROS_INFO("BUMPER PRESSED EVENT");
+
+				// 遇到碰撞时取消逃跑状态
+				if(status == S_ESCAPE) {
+					status = S_FOLLOW;
+					playingSound = false;
+				}
 				
 				if(!playingSound){
 					playingSound = true;
@@ -163,8 +153,45 @@ int main(int argc, char **argv)
 				break;
 			}
 
+			case S_ESCAPE:
+			{
+				ROS_WARN("ESCAPE MODE ACTIVATED!");
+				
+				// 1. 播放恐惧声音
+				if(!playingSound){
+					sc.playWave(path_to_sounds + "Sad_SPBB.wav");
+					playingSound = true;
+				}
+
+				// 2. 执行逃跑动作（先旋转180度，然后前进）
+				ros::Duration escapeDuration = ros::Time::now() - escapeStartTime;
+				
+				if(escapeDuration < ros::Duration(2.0)) {
+					// 第一阶段：快速旋转
+					setMovement(vel, vel_pub, 0.0, 1.5);  // 原地旋转
+				}
+				else if(escapeDuration < ros::Duration(5.0)) {
+					// 第二阶段：直线逃跑
+					setMovement(vel, vel_pub, 0.5, 0.0);  // 快速前进
+				}
+				else {
+					// 逃跑结束恢复跟随
+					status = S_FOLLOW;
+					playingSound = false;
+					setMovement(vel, vel_pub, 0.0, 0.0);  // 停止运动
+				}
+				
+				break;
+			}
+
 			case S_CLIFF:{
 				ROS_INFO("CLIFF ACTIVE EVENT");
+
+				// 遇到碰撞时取消逃跑状态
+				if(status == S_ESCAPE) {
+					status = S_FOLLOW;
+					playingSound = false;
+				}
 
 				setMovement(vel, vel_pub, 0, 0);
 

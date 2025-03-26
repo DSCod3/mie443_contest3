@@ -4,7 +4,6 @@
 #include <chrono>
 #include <bumper.h>
 #include <cliff.h>
-#include <std_msgs/String.h>
 
 using namespace std;
 
@@ -14,26 +13,35 @@ int stop_count = 0;
 Status status;
 bool playingSound = false;
 
-// New flag to ensure lost state isn’t repeatedly triggered
-bool lostTriggered = false;
-
-void handleLostTrack(){
-    ROS_INFO("Robot lost track.");
-    // Implement any additional lost-tracking behavior here.
-    // For example, you might rotate slowly to search for the target.
+void handleLostTrack(ros::Publisher &vel_pub, geometry_msgs::Twist &vel) {
+    // Rotate in place once to search for the target.
+    ROS_INFO("Robot lost track. Rotating in place to search for target.");
+    // Play the lost-tracking sound before rotating.
+    sound_play::SoundClient sc;
+    string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
+    sc.playWave(path_to_sounds + "Sad Violin Sound Effect.wav");
+    // Rotate in place for 3 seconds.
+    auto rotationStart = std::chrono::system_clock::now();
+    while(ros::ok() && std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - rotationStart).count() < 3) {
+        // Rotate slowly (angular velocity = 0.3 rad/s, no forward movement).
+        setMovement(vel, vel_pub, 0, 0.3);
+        ros::spinOnce();
+        ros::Duration(0.1).sleep();
+    }
 }
 
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
-    // Log the received command for debugging.
+    // Log for debugging.
     ROS_INFO("x, y, z: [%f, %f, %f]", msg.linear.x, msg.linear.y, msg.angular.z);
-    // Reset stop_count and lost flag if the robot receives any movement command.
+    
+    // Reset stop_count if any movement is detected.
     if(fabs(follow_cmd.linear.x) > 0.01 || fabs(follow_cmd.angular.z) > 0.01){
         stop_count = 0;
+        // If target is found, revert to follow state.
         if(status != S_FOLLOW) {
-            ROS_INFO("Target found, reverting to S_FOLLOW");
+            ROS_INFO("Target reacquired, reverting to S_FOLLOW");
             status = S_FOLLOW;
-            lostTriggered = false;
         }
     } else {
         stop_count++;
@@ -65,7 +73,7 @@ int main(int argc, char **argv)
     ros::Subscriber cliff_sub = nh.subscribe("/mobile_base/sensors/core", 10, &cliffCallback);
 
     ros::Rate loop_rate(10);
-    std::chrono::time_point<std::chrono::system_clock> start = std::chrono::system_clock::now();
+    auto start = std::chrono::system_clock::now();
     uint64_t secondsElapsed = 0;
     uint64_t timeReference = 0;
     bool backingSoundPlayed = false;
@@ -87,38 +95,76 @@ int main(int argc, char **argv)
 
     while(ros::ok() && secondsElapsed <= 480){		
         ros::spinOnce();
-        secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
-            std::chrono::system_clock::now() - start).count();
-
-        // LOST TRACKING CHECK:
-        // Only trigger lost state if stop_count exceeds threshold AND lost hasn't been triggered.
-        if(status == S_FOLLOW && stop_count > 5 && !lostTriggered) {
-            lostTriggered = true;
-            handleLostTrack();
-            sc.playWave(path_to_sounds + "Sad Violin Sound Effect.wav");  // Use a gentle, sad sound.
-            status = S_PLACEHOLDER;
-        }
+        secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
 
         switch(status){
             case S_FOLLOW:
             {
                 ROS_INFO("STATE: S_FOLLOW");
+
+                // Handle lost tracking.
+                if (follow_cmd.linear.x == 0 && follow_cmd.angular.z == 0) {
+                    stop_count++;
+                } else {
+                    stop_count = 0; // Reset if the robot moves again
+                }
+                ROS_INFO("STOP COUNT: %d", stop_count);
+			
+                if (stop_count > 5) { // Threshold for lost tracking.
+                    handleLostTrack(vel_pub, vel);
+                    stop_count = 0; // Reset count after handling lost state.
+                    status = S_PLACEHOLDER;
+                }
+
                 playingSound = false;
                 vel_pub.publish(follow_cmd);
+
+                // Existing backup detection code is kept unchanged.
+                static bool last_back_state = false;
+                bool current_back_state = (follow_cmd.linear.x < -0.01);
+				
+                if(current_back_state != last_back_state) {
+                    backupStartTime = ros::Time::now(); // Reset timer on state change.
+                }
+				
+                if(current_back_state) {
+                    if((ros::Time::now() - backupStartTime) > debounceDuration) {
+                        if(!isCounting) {
+                            backupStartTime = ros::Time::now();
+                            isCounting = true;
+                            ROS_INFO("Real backing started");
+                        }
+                        if((ros::Time::now() - backupStartTime).toSec() > 3.0 && !backingSoundPlayed) {
+                            sc.playWave(path_to_sounds + "fear_scream.wav");
+                            backingSoundPlayed = true;
+                            ROS_WARN("Fear sound triggered after 3s");
+                            status = S_ESCAPE;
+                            escapeStartTime = ros::Time::now();
+                        }
+                    }
+                } else {
+                    isCounting = false;
+                    if(backingSoundPlayed) {
+                        backupStartTime = ros::Time::now() - ros::Duration(5.0);
+                    }
+                    backingSoundPlayed = false;
+                }
+				
+                last_back_state = current_back_state;
                 break;
             }
             case S_BUMPER:
             {
                 ROS_INFO("STATE: BUMPER PRESSED EVENT");
-                // Cancel any escape mode.
+
                 if(status == S_ESCAPE) {
                     status = S_FOLLOW;
                     playingSound = false;
                 }
-                
+				
                 if(!playingSound){
                     playingSound = true;
-                    sc.playWave(path_to_sounds + "Anger Management.wav");  // Use a deep, grumbling sound for anger.
+                    sc.playWave(path_to_sounds + "Anger Management.wav");
                 }
 
                 timeReference = secondsElapsed;
@@ -128,20 +174,19 @@ int main(int argc, char **argv)
                     setMovement(vel, vel_pub, -0.2, 0);
                 }
 							
-                // Vigorously shake left to right.
-                // Increase number of iterations or adjust duration for extra effect.
+                // Add vigorous shaking: alternate left/right.
                 for (int i = 0; i < 5; i++){
-                    ROS_INFO("Vigorously Shaking LEFT");
+                    ROS_INFO("Shaking LEFT");
                     setMovement(vel, vel_pub, 0, 6.0);
                     ros::Duration(0.06).sleep();
-                    ROS_INFO("Vigorously Shaking RIGHT");
+                    ROS_INFO("Shaking RIGHT");
                     setMovement(vel, vel_pub, 0, -6.0);
                     ros::Duration(0.06).sleep();
                 }
 				
                 setMovement(vel, vel_pub, 0, 0);
-                ros::spinOnce();				
-                status = S_FOLLOW;  // Return to follow state.
+                ros::spinOnce();
+                status = S_FOLLOW;
                 playingSound = false;
                 break;
             }
@@ -153,19 +198,16 @@ int main(int argc, char **argv)
                     sc.playWave(path_to_sounds + "fear_scream.wav");
                     playingSound = true;
                 }
-
+				
                 ros::Duration escapeDuration = ros::Time::now() - escapeStartTime;
 				
                 if(escapeDuration < ros::Duration(2.0)) {
-                    // First phase: rapid rotation.
                     setMovement(vel, vel_pub, 0.0, 1.5);
                 }
                 else if(escapeDuration < ros::Duration(5.0)) {
-                    // Second phase: rapid forward movement.
                     setMovement(vel, vel_pub, 0.5, 0.0);
                 }
                 else {
-                    // End escape, resume following.
                     status = S_FOLLOW;
                     playingSound = false;
                     setMovement(vel, vel_pub, 0.0, 0.0);
@@ -176,29 +218,32 @@ int main(int argc, char **argv)
             case S_CLIFF:
             {
                 ROS_INFO("STATE: CLIFF ACTIVE EVENT");
-                // For surprise (e.g., when the robot is picked up) use a high-pitched, sudden gasp.
+
+                if(status == S_ESCAPE) {
+                    status = S_FOLLOW;
+                    playingSound = false;
+                }
+
+                setMovement(vel, vel_pub, 0, 0);
+
                 if(!playingSound){
                     playingSound = true;
-                    sc.playWave(path_to_sounds + "Suprised.wav");  // Ensure this file is a surprised sound effect.
+                    sc.playWave(path_to_sounds + "Suprised.wav");
                 }
-                setMovement(vel, vel_pub, 0, 0);
+				
                 break;
             }
             case S_PLACEHOLDER:
             {
-                // In lost state, if movement is detected (target found), revert to follow.
-                if(fabs(follow_cmd.linear.x) > 0.01 || fabs(follow_cmd.angular.z) > 0.01){
-                    ROS_INFO("FOUND TARGET, reverting to S_FOLLOW");
-                    status = S_FOLLOW;
-                    lostTriggered = false;
-                    playingSound = false;
-                    break;
-                }
-                handleLostTrack();
+                // In lost state, do nothing here; waiting for valid tracking command.
+                ROS_INFO("STATE: LOST TRACKING - TARGET NOT FOUND");
+                setMovement(vel, vel_pub, 0, 0);
                 break;
             }
         }
 
+        secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::now()-start).count();
         loop_rate.sleep();
     }
 

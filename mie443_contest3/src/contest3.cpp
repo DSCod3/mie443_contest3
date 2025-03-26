@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 						
 						// 主计时检测（3秒触发）
 						if((ros::Time::now() - backupStartTime).toSec() > 3.0 && !backingSoundPlayed) {
-							sc.playWave(path_to_sounds + "Sad_SPBB.wav");
+							sc.playWave(path_to_sounds + "fear_scream.wav");
 							backingSoundPlayed = true;
 							ROS_WARN("Fear sound triggered after 3s");
 						}

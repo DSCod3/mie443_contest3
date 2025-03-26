@@ -4,7 +4,7 @@
 #include <chrono>
 #include <bumper.h>
 #include <cliff.h>
-
+#include <fear.h>
 
 using namespace std;
 
@@ -45,7 +45,7 @@ int main(int argc, char **argv)
 	ros::Subscriber follower = nh.subscribe("follower_velocity_smoother/smooth_cmd_vel", 10, &followerCB);
 	ros::Subscriber bumper = nh.subscribe("mobile_base/events/bumper", 10, &bumperCallback);
 	ros::Subscriber cliff_sub = nh.subscribe("/mobile_base/sensors/core", 10, &cliffCallback);
-	
+	ros::Subscriber fear_sub = nh.subscribe("cmd_vel", 1, &fearCheckCallback);
 
 
     // contest count down timer
@@ -81,15 +81,14 @@ int main(int argc, char **argv)
 		ros::spinOnce();
 
 		switch(status){
-
-
 			case S_FOLLOW:
+			{
 				ROS_INFO("S_FOLLOW");
 				playingSound = false;
 			
 				vel_pub.publish(follow_cmd);
 			
-				// 防抖动检测后退状态
+				// 将相关变量声明移到case代码块内部，并用{}包裹整个case
 				static bool last_back_state = false;
 				bool current_back_state = (follow_cmd.linear.x < -0.01);
 				
@@ -127,8 +126,8 @@ int main(int argc, char **argv)
 				
 				last_back_state = current_back_state;
 				break;
-				
-			case S_BUMPER:
+			}
+			case S_BUMPER:{
 				ROS_INFO("BUMPER PRESSED EVENT");
 				
 				if(!playingSound){
@@ -146,8 +145,9 @@ int main(int argc, char **argv)
 				ros::spinOnce();				
 				
 				break;
+			}
 
-			case S_CLIFF:
+			case S_CLIFF:{
 				ROS_INFO("CLIFF ACTIVE EVENT");
 
 				setMovement(vel, vel_pub, 0, 0);
@@ -159,13 +159,12 @@ int main(int argc, char **argv)
 				
 				// Cliff sensor needs to be debounced. 
 				break;
+			}
 
-			case S_MICROPHONE:
+			case S_PLACEHOLDER:{
 				setMovement(vel, vel_pub, 0, 0);
 				break;
-			case S_PLACEHOLDER:
-				setMovement(vel, vel_pub, 0, 0);
-				break;
+			}
 		}
 
 		secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();

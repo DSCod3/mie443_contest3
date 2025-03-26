@@ -11,15 +11,14 @@ int stop_count = 0;
 
 void handleLostTrack(){
 	ROS_INFO("Robot lost track.");
-    // Play a sound or change LED colors, etc.
     sound_play::SoundClient sc;
     string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
-    sc.playWave(path_to_sounds + "sad_sound.wav");  // Change path
+    sc.playWave(path_to_sounds + "sound.wav");  // Change path
 }
 
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
-    if (msg.linear.x == 0 && msg.angular.z == 0) {
+    if (msg.linear.x == 0 && msg.linear.y == 0 && msg.angular.z == 0) {
         stop_count++;
     } else {
         stop_count = 0; // Reset if the robot moves again
@@ -84,7 +83,7 @@ int main(int argc, char **argv)
 			//fill with your code
 			// vel_pub.publish(vel);
 			vel_pub.publish(follow_cmd);
-			sc.playWave(path_to_sounds+"sound.wav");
+			//sc.playWave(path_to_sounds+"sound.wav");
 
 		}else if(world_state == 1){
 			/*

@@ -197,7 +197,12 @@ private:
         ROS_INFO_THROTTLE(1, "Centroid too far away %f, stopping the robot\n", z);
         if (enabled_)
         {
-          cmdpub_.publish(geometry_msgs::TwistPtr(new geometry_msgs::Twist()));
+          // cmdpub_.publish(geometry_msgs::TwistPtr(new geometry_msgs::Twist()));
+          geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
+          cmd->linear.x = 0;
+          cmd->linear.y = 0;
+          cmd->angular.z = 0;
+          cmdpub_.publish(cmd);
         }
         return;
       }
@@ -220,7 +225,12 @@ private:
 
       if (enabled_)
       {
-        cmdpub_.publish(geometry_msgs::TwistPtr(new geometry_msgs::Twist()));
+          // cmdpub_.publish(geometry_msgs::TwistPtr(new geometry_msgs::Twist()));
+          geometry_msgs::TwistPtr cmd(new geometry_msgs::Twist());
+          cmd->linear.x = 0;
+          cmd->linear.y = 0;
+          cmd->angular.z = 0;
+          cmdpub_.publish(cmd);
       }
     }
 

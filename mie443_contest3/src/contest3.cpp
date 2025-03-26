@@ -54,6 +54,7 @@ int main(int argc, char **argv)
 	uint64_t timeReference = 0;
 	bool backingSoundPlayed = false; // Add this with other global variables
 	ros::Time backupStartTime;
+	ros::Time escapeStartTime;
 	bool isCounting = false;
 	ros::Duration debounceDuration(0.5); // 防抖动时间窗口
 
@@ -159,7 +160,7 @@ int main(int argc, char **argv)
 				
 				// 1. 播放恐惧声音
 				if(!playingSound){
-					sc.playWave(path_to_sounds + "Sad_SPBB.wav");
+					sc.playWave(path_to_sounds + "fear_scream.wav");
 					playingSound = true;
 				}
 

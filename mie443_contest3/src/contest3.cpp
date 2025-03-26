@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 			case S_FEAR:
 				handleFearState(vel, vel_pub, sc, path_to_sounds);
 				break;
-				
+
 			case S_FOLLOW:
 				ROS_INFO("S_FOLLOW");
 				playingSound = false;
@@ -116,15 +116,6 @@ int main(int argc, char **argv)
 				}
 				
 				// Cliff sensor needs to be debounced. 
-				timeReference = secondsElapsed;
-				while(secondsElapsed - timeReference < 1){
-					if(status == S_CLIFF){
-						secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
-						timeReference = secondsElapsed;
-					}
-					ros::spinOnce();
-				}
-				
 				break;
 
 			case S_MICROPHONE:

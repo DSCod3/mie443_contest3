@@ -56,7 +56,7 @@ enum Status {
     S_CLIFF,
     S_ESCAPE,
     S_MICROPHONE,
-    S_PLACEHOLDER
+    S_LOST_TRACK
 };
 
 extern Status status;

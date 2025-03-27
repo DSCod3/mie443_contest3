@@ -13,22 +13,22 @@ int stop_count = 0;
 Status status;
 bool playingSound = false;
 
-
-
-void handleLostTrack(){
-	ROS_INFO("Robot lost track.");
-    sound_play::SoundClient sc;
-    string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
-    
-}
-
 void followerCB(const geometry_msgs::Twist msg){
     follow_cmd = msg;
-	// for test
-	ROS_INFO("x, y, z: [%f, %f, %f]", msg.linear.x, msg.linear.y, msg.angular.z);
-	//ROS_INFO("Angular: [%f, %f, %f]", msg.angular.x, msg.angular.y, msg.angular.z);
+    ROS_INFO("x, y, z: [%f, %f, %f]", msg.linear.x, msg.linear.y, msg.angular.z);
     
+    if (msg.linear.x == 0 && msg.angular.z == 0) {
+        stop_count++;
+    } else {
+        stop_count = 0; // Reset if the robot moves again
+    }
+    
+    if (stop_count > 5) {
+        status = S_LOST_TRACK; // 切换到丢失跟踪状态
+        stop_count = 0; // Reset count after handling
+    }
 }
+
 
 void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){
 	vel.angular.z = rz;
@@ -67,6 +67,7 @@ int main(int argc, char **argv)
 	bool backingSoundPlayed = false; // Add this with other global variables
 	ros::Time backupStartTime;
 	ros::Time escapeStartTime;
+	ros::Time lostTrackStartTime;
 	bool isCounting = false;
 	ros::Duration debounceDuration(0.5); // 防抖动时间窗口
 
@@ -106,9 +107,8 @@ int main(int argc, char **argv)
 				ROS_INFO("STOP COUNT: %d", stop_count);
 			
 				if (stop_count > 5) { // Adjust threshold based on responsiveness needs
-					handleLostTrack();
+					status = S_LOST_TRACK;
 					stop_count = 0; // Reset count after handling
-					sc.playWave(path_to_sounds + "Sad_SPBB.wav");  // Change path
 				}
 
 
@@ -234,10 +234,21 @@ int main(int argc, char **argv)
 				break;
 			}
 
-			case S_PLACEHOLDER:{
-				handleLostTrack();
+			case S_LOST_TRACK:{
+				ROS_INFO("Robot lost track.");
+				if (!playingSound) {
+					sc.playWave(path_to_sounds + "Sad_SPBB.wav");
+					playingSound = true;
+					lostTrackStartTime = ros::Time::now(); // 记录播放开始的时间
+				}
+				
+				if ((ros::Time::now() - lostTrackStartTime).toSec() > 2.0) {
+					playingSound = false;
+					status = S_FOLLOW;
+				}
 				break;
 			}
+
 		}
 
 		secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();

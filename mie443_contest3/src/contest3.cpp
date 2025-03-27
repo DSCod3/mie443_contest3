@@ -198,12 +198,12 @@ int main(int argc, char **argv)
 				
 				if(escapeDuration < ros::Duration(2.0)) {
 					// 第一阶段：快速旋转
-					setMovement(vel, vel_pub, 0.0, 1.5);  // 原地旋转
+					setMovement(vel, vel_pub, -0.5, 0);  // 快速后退， 看看会不会丢目标
 				}
-				else if(escapeDuration < ros::Duration(5.0)) {
-					// 第二阶段：直线逃跑
-					setMovement(vel, vel_pub, 0.5, 0.0);  // 快速前进
-				}
+				// else if(escapeDuration < ros::Duration(5.0)) {
+				// 	// 第二阶段：直线逃跑
+				// 	setMovement(vel, vel_pub, 0.5, 0.0);  // 快速前进
+				// }
 				else {
 					// 逃跑结束恢复跟随
 					status = S_FOLLOW;

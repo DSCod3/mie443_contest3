@@ -4,13 +4,11 @@
 #include <chrono>
 #include <bumper.h>
 #include <cliff.h>
-#include <SFML/Graphics.hpp>
+#include <opencv2/opencv.hpp>
 #include <thread>
 
 using namespace std;
 
-// sudo apt update
-// sudo apt install libsfml-dev
 
 
 geometry_msgs::Twist follow_cmd;
@@ -46,36 +44,15 @@ void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, f
 }
 
 
-// Function to display a full-screen emoji for a given duration
-void showEmojiFullscreen(const std::string& emoji, int fontSize, int durationMs) {
-    sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Fear Emoji", sf::Style::Fullscreen);
+void showEmojiFullscreen(const std::string& imagePath, int durationMs) {
+    cv::Mat img = cv::imread(imagePath);
+    if (img.empty()) return;
 
-    sf::Font font;
-    if (!font.loadFromFile("arial.ttf")) { // Ensure arial.ttf is in the working directory
-        return; // Exit if font loading fails
-    }
-
-    sf::Text text(emoji, font, fontSize);
-    text.setFillColor(sf::Color::White);
-    text.setPosition(window.getSize().x / 2 - fontSize / 2, window.getSize().y / 2 - fontSize / 2);
-
-    auto start = std::chrono::steady_clock::now();
-    while (window.isOpen()) {
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed)
-                window.close();
-        }
-
-        window.clear();
-        window.draw(text);
-        window.display();
-
-        // Close window after specified duration
-        if (std::chrono::steady_clock::now() - start > std::chrono::milliseconds(durationMs)) {
-            window.close();
-        }
-    }
+    cv::namedWindow("Emoji", cv::WINDOW_NORMAL);
+    cv::setWindowProperty("Emoji", cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
+    cv::imshow("Emoji", img);
+    cv::waitKey(durationMs);
+    cv::destroyAllWindows();
 }
 
 //-------------------------------------------------------------
@@ -210,7 +187,7 @@ int main(int argc, char **argv)
 				if(!playingSound){
 					playingSound = true;
 					sc.playWave(path_to_sounds + "Angry.wav");
-					showEmojiFullscreen("😠", 200, 2000); // Angry
+					showEmojiFullscreen("angry_emoji.png", 3000);
 				}
 
 				timeReference = secondsElapsed;
@@ -232,7 +209,7 @@ int main(int argc, char **argv)
 				// 1. 播放恐惧声音
 				if(!playingSound){
 					sc.playWave(path_to_sounds + "fear_scream.wav");
-					showEmojiFullscreen("😨", 200, 2000); // Fear
+					showEmojiFullscreen("fear_emoji.png", 3000);
 					playingSound = true;
 				}
 
@@ -271,7 +248,7 @@ int main(int argc, char **argv)
 				if(!playingSound){
 					playingSound = true;
 					sc.playWave(path_to_sounds + "Proud.wav");
-					showEmojiFullscreen("😤", 200, 2000); // Proud
+					showEmojiFullscreen("proud_emoji.png", 3000); // Proud
 				}
 				
 				// Cliff sensor needs to be debounced. 
@@ -282,7 +259,7 @@ int main(int argc, char **argv)
 				ROS_INFO("Robot lost track.");
 				if (!playingSound) {
 					sc.playWave(path_to_sounds + "Sad_SPBB.wav");
-    				showEmojiFullscreen("😢", 200, 2000); // Sad
+    				showEmojiFullscreen("sad_emoji.png", 3000); // Sad
 					playingSound = true; // Set playing to true to avoid replaying sound
 				}
 			

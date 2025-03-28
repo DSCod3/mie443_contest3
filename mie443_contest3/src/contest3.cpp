@@ -229,7 +229,7 @@ int main(int argc, char **argv)
 
 				if(!playingSound){
 					playingSound = true;
-					sc.playWave(path_to_sounds + "Suprised.wav");
+					sc.playWave(path_to_sounds + "Proud.wav");
 				}
 				
 				// Cliff sensor needs to be debounced. 

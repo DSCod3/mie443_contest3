@@ -1,6 +1,7 @@
 {
     "files.associations": {
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "xstring": "cpp"
     },
     "cmake.sourceDirectory": "/home/tuesday/catkin_ws/src/mie443_contest3/turtlebot_follower"
 }

@@ -45,7 +45,7 @@ void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, f
 
 
 void showEmojiFullscreen(const std::string& imagePath, int durationMs) {
-    cv::Mat img = cv::imread(imagePath);
+    cv::Mat img = cv::imread(path_to_emoji + imagePath);
     if (img.empty()) return;
 
     cv::namedWindow("Emoji", cv::WINDOW_NORMAL);
@@ -65,6 +65,7 @@ int main(int argc, char **argv)
 	ros::NodeHandle nh;
 	sound_play::SoundClient sc;
 	string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
+	string path_to_emoji = ros::package::getPath("mie443_contest3") + "/emoji/";
 	teleController eStop;
 
 	//publishers
@@ -187,7 +188,7 @@ int main(int argc, char **argv)
 				if(!playingSound){
 					playingSound = true;
 					sc.playWave(path_to_sounds + "Angry.wav");
-					showEmojiFullscreen("angry_emoji.png", 3000);
+					showEmojiFullscreen("angry_emoji.png", 2000);
 				}
 
 				timeReference = secondsElapsed;
@@ -209,7 +210,7 @@ int main(int argc, char **argv)
 				// 1. 播放恐惧声音
 				if(!playingSound){
 					sc.playWave(path_to_sounds + "fear_scream.wav");
-					showEmojiFullscreen("fear_emoji.png", 3000);
+					showEmojiFullscreen("fear_emoji.png", 2000);
 					playingSound = true;
 				}
 
@@ -248,7 +249,7 @@ int main(int argc, char **argv)
 				if(!playingSound){
 					playingSound = true;
 					sc.playWave(path_to_sounds + "Proud.wav");
-					showEmojiFullscreen("proud_emoji.png", 3000); // Proud
+					showEmojiFullscreen("proud_emoji.png", 2000); // Proud
 				}
 				
 				// Cliff sensor needs to be debounced. 
@@ -259,7 +260,7 @@ int main(int argc, char **argv)
 				ROS_INFO("Robot lost track.");
 				if (!playingSound) {
 					sc.playWave(path_to_sounds + "Sad_SPBB.wav");
-    				showEmojiFullscreen("sad_emoji.png", 3000); // Sad
+    				showEmojiFullscreen("sad_emoji.png", 2000); // Sad
 					playingSound = true; // Set playing to true to avoid replaying sound
 				}
 			

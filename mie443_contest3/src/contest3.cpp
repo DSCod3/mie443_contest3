@@ -13,21 +13,23 @@ int stop_count = 0;
 Status status;
 bool playingSound = false;
 
-void followerCB(const geometry_msgs::Twist msg){
+void followerCB(const geometry_msgs::Twist msg) {
     follow_cmd = msg;
     ROS_INFO("x, y, z: [%f, %f, %f]", msg.linear.x, msg.linear.y, msg.angular.z);
-    
+
+    // Evaluate the tracking condition
     if (msg.linear.x == 0 && msg.angular.z == 0) {
-        stop_count++;
+        if (++stop_count > 5) { // Confirm consistent lost track condition
+            if (status != S_LOST_TRACK) { // Prevent re-triggering if already in lost track state
+                status = S_LOST_TRACK;
+            }
+            stop_count = 0; // Optional: Reset stop_count if desired
+        }
     } else {
-        stop_count = 0; // Reset if the robot moves again
-    }
-    
-    if (stop_count > 5) {
-        status = S_LOST_TRACK; // 切换到丢失跟踪状态
-        stop_count = 0; // Reset count after handling
+        stop_count = 0; // Reset stop count whenever there's movement
     }
 }
+
 
 
 void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){
@@ -234,20 +236,24 @@ int main(int argc, char **argv)
 				break;
 			}
 
-			case S_LOST_TRACK:{
+			case S_LOST_TRACK: {
 				ROS_INFO("Robot lost track.");
 				if (!playingSound) {
 					sc.playWave(path_to_sounds + "Sad_SPBB.wav");
-					playingSound = true;
-					lostTrackStartTime = ros::Time::now(); // 记录播放开始的时间
+					playingSound = true; // Set playing to true to avoid replaying sound
 				}
-				
-				if ((ros::Time::now() - lostTrackStartTime).toSec() > 2.0) {
-					playingSound = false;
-					status = S_FOLLOW;
+			
+				// This checks if the robot continues to be in lost track state
+				if (follow_cmd.linear.x == 0 && follow_cmd.angular.z == 0) {
+					// Still lost, do nothing more, just wait
+				} else {
+					// If we have movement again, assume we are tracking again
+					playingSound = false; // Reset playing state
+					status = S_FOLLOW; // Change status back to follow
 				}
 				break;
 			}
+			
 
 		}
 

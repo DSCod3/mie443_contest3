@@ -45,14 +45,15 @@ void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, f
 
 
 void showEmojiFullscreen(const std::string& imagePath, int durationMs) {
+	string path_to_emoji = ros::package::getPath("mie443_contest3") + "/emoji/";
     cv::Mat img = cv::imread(path_to_emoji + imagePath);
     if (img.empty()) return;
 
     cv::namedWindow("Emoji", cv::WINDOW_NORMAL);
     cv::setWindowProperty("Emoji", cv::WND_PROP_FULLSCREEN, cv::WINDOW_FULLSCREEN);
     cv::imshow("Emoji", img);
-    cv::waitKey(durationMs);
-    cv::destroyAllWindows();
+    cv::waitKey(1000);
+    
 }
 
 //-------------------------------------------------------------
@@ -65,7 +66,7 @@ int main(int argc, char **argv)
 	ros::NodeHandle nh;
 	sound_play::SoundClient sc;
 	string path_to_sounds = ros::package::getPath("mie443_contest3") + "/sounds/";
-	string path_to_emoji = ros::package::getPath("mie443_contest3") + "/emoji/";
+	
 	teleController eStop;
 
 	//publishers
@@ -116,7 +117,7 @@ int main(int argc, char **argv)
 			{
 				ROS_INFO("S_FOLLOW");
 
-
+				cv::destroyAllWindows();
 				////////handle lost
 				if (follow_cmd.linear.x == 0 && follow_cmd.angular.z == 0) {
 					stop_count++;
@@ -192,7 +193,7 @@ int main(int argc, char **argv)
 				}
 
 				timeReference = secondsElapsed;
-				while(secondsElapsed - timeReference < 2){
+				while(secondsElapsed - timeReference < 3){
 					secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
 					setMovement(vel, vel_pub, -0.2, 0);
 				}
@@ -219,12 +220,16 @@ int main(int argc, char **argv)
 				
 				if(escapeDuration < ros::Duration(2.0)) {
 					// 第一阶段：快速旋转
-					setMovement(vel, vel_pub, -0.5, 0);  // 快速后退， 看看会不会丢目标
+					setMovement(vel, vel_pub, -0.3, 0);  // 快速后退， 看看会不会丢目标
 				}
-				// else if(escapeDuration < ros::Duration(5.0)) {
-				// 	// 第二阶段：直线逃跑
-				// 	setMovement(vel, vel_pub, 0.5, 0.0);  // 快速前进
-				// }
+				else if(escapeDuration < ros::Duration(2.5)) {
+					// 第二阶段：直线逃跑
+					setMovement(vel, vel_pub, 0,-2);  // 快速前进
+				}
+				else if(escapeDuration < ros::Duration(3)) {
+					// 第二阶段：直线逃跑
+					setMovement(vel, vel_pub, 0, 2);  // 快速前进
+				}
 				else {
 					// 逃跑结束恢复跟随
 					status = S_FOLLOW;

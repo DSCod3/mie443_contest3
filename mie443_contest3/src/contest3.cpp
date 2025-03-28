@@ -5,9 +5,12 @@
 #include <bumper.h>
 #include <cliff.h>
 #include <SFML/Graphics.hpp>
-#include <chrono>
+#include <thread>
 
 using namespace std;
+
+// sudo apt update
+// sudo apt install libsfml-dev
 
 
 geometry_msgs::Twist follow_cmd;

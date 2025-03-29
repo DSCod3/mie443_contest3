@@ -189,7 +189,7 @@ int main(int argc, char **argv)
 				if(!playingSound){
 					playingSound = true;
 					sc.playWave(path_to_sounds + "Angry.wav");
-					showEmojiFullscreen("angry_emoji.png", 2000);
+					showEmojiFullscreen("very_angry_emoji.png", 2000);
 				}
 
 				timeReference = secondsElapsed;

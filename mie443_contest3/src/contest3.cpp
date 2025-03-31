@@ -17,6 +17,13 @@ int stop_count = 0;
 Status status;
 bool playingSound = false;
 
+void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){
+	vel.angular.z = rz;
+	vel.linear.x = lx;
+	vel_pub.publish(vel);
+	ros::spinOnce();
+}
+
 void performShaking(ros::Publisher &vel_pub, geometry_msgs::Twist &vel) {
     for (int i = 0; i < 5; i++){
         ROS_INFO("Shaking LEFT");
@@ -43,15 +50,6 @@ void followerCB(const geometry_msgs::Twist msg) {
     } else {
         stop_count = 0; // Reset stop count whenever there's movement
     }
-}
-
-
-
-void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, float rz){
-	vel.angular.z = rz;
-	vel.linear.x = lx;
-	vel_pub.publish(vel);
-	ros::spinOnce();
 }
 
 

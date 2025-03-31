@@ -10,7 +10,6 @@
 using namespace std;
 
 
-
 geometry_msgs::Twist follow_cmd;
 int world_state;
 int stop_count = 0;
@@ -24,7 +23,8 @@ void setMovement(geometry_msgs::Twist &vel, ros::Publisher &vel_pub, float lx, f
 	ros::spinOnce();
 }
 
-void performShaking(ros::Publisher &vel_pub, geometry_msgs::Twist &vel) {
+void performShaking(ros::Publisher &vel_pub, geometry_msgs::Twist &vel, float originalHeading) {
+    // Perform vigorous shaking: 5 cycles of alternating turns.
     for (int i = 0; i < 5; i++){
         ROS_INFO("Shaking LEFT");
         setMovement(vel, vel_pub, 0, 6.0);
@@ -33,6 +33,13 @@ void performShaking(ros::Publisher &vel_pub, geometry_msgs::Twist &vel) {
         setMovement(vel, vel_pub, 0, -6.0);
         ros::Duration(0.06).sleep();
     }
+    // Restore the original heading.
+    ROS_INFO("Restoring original heading.");
+    // Here, I assume that the desired heading is zero angular command.
+    // If the robot had a nonzero desired heading before shaking, pass that value instead
+    setMovement(vel, vel_pub, 0, originalHeading);
+    ros::Duration(0.2).sleep();
+    setMovement(vel, vel_pub, 0, 0);
 }
 
 void followerCB(const geometry_msgs::Twist msg) {
@@ -209,8 +216,11 @@ int main(int argc, char **argv)
 				}
 				setMovement(vel, vel_pub, 0, 0);
 				
-				// Call the shaking function. This function can be commented out if needed.
-				performShaking(vel_pub, vel);
+
+				// Save original heading
+				float originalHeading = follow_cmd.angular.z;
+				// Call the shaking function and restore original heading. This function can be commented out if needed.
+				performShaking(vel_pub, vel, originalHeading);
 				
 				// Remain in bumper state until a valid tracking command is received.
 				while(status == S_BUMPER && ros::ok()) {

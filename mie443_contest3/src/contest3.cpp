@@ -17,6 +17,17 @@ int stop_count = 0;
 Status status;
 bool playingSound = false;
 
+void performShaking(ros::Publisher &vel_pub, geometry_msgs::Twist &vel) {
+    for (int i = 0; i < 5; i++){
+        ROS_INFO("Shaking LEFT");
+        setMovement(vel, vel_pub, 0, 6.0);
+        ros::Duration(0.06).sleep();
+        ROS_INFO("Shaking RIGHT");
+        setMovement(vel, vel_pub, 0, -6.0);
+        ros::Duration(0.06).sleep();
+    }
+}
+
 void followerCB(const geometry_msgs::Twist msg) {
     follow_cmd = msg;
     ROS_INFO("x, y, z: [%f, %f, %f]", msg.linear.x, msg.linear.y, msg.angular.z);
@@ -180,7 +191,7 @@ int main(int argc, char **argv)
 			case S_BUMPER:{
 				ROS_INFO("BUMPER PRESSED EVENT");
 
-				// 遇到碰撞时取消逃跑状态
+				// 1. 播放声音
 				if(status == S_ESCAPE) {
 					status = S_FOLLOW;
 					playingSound = false;
@@ -188,19 +199,27 @@ int main(int argc, char **argv)
 				
 				if(!playingSound){
 					playingSound = true;
-					sc.playWave(path_to_sounds + "Angry.wav");
+					sc.playWave(path_to_sounds + "Anger Management.wav");
 					showEmojiFullscreen("rage_image.png", 2000);
 				}
 
 				timeReference = secondsElapsed;
-				while(secondsElapsed - timeReference < 3){
-					secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now()-start).count();
+				while(secondsElapsed - timeReference < 3) {
+					secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(
+						std::chrono::system_clock::now()-start).count();
 					setMovement(vel, vel_pub, -0.2, 0);
 				}
-							
 				setMovement(vel, vel_pub, 0, 0);
-				ros::spinOnce();				
 				
+				// Call the shaking function. This function can be commented out if needed.
+				performShaking(vel_pub, vel);
+				
+				// Remain in bumper state until a valid tracking command is received.
+				while(status == S_BUMPER && ros::ok()) {
+					ros::spinOnce();
+					// Do nothing; waiting for followerCB to change status.
+					ros::Duration(0.1).sleep();
+				}
 				break;
 			}
 
@@ -264,7 +283,7 @@ int main(int argc, char **argv)
 			case S_LOST_TRACK: {
 				ROS_INFO("Robot lost track.");
 				if (!playingSound) {
-					sc.playWave(path_to_sounds + "Sad_SPBB.wav");
+					sc.playWave(path_to_sounds + "Sad Violin Sound Effect.wav");
     				showEmojiFullscreen("sad_emoji.png", 2000); // Sad
 					playingSound = true; // Set playing to true to avoid replaying sound
 				}

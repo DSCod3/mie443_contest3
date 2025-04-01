@@ -204,7 +204,7 @@ int main(int argc, char **argv)
 				
 				if(!playingSound){
 					playingSound = true;
-					sc.playWave(path_to_sounds + "Anger Management.wav");
+					sc.playWave(path_to_sounds + "rage_bull.wav");
 					showEmojiFullscreen("rage_image.png", 2000);
 				}
 
